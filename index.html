@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Perfumery</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root{
+  --bg:#17120F;
+  --surface:#211A15;
+  --surface-2:#2A2119;
+  --line:#40342A;
+  --text:#EFE7DA;
+  --text-muted:#A5978A;
+  --amber:#C97C3D;
+  --gold:#B08D57;
+  --danger:#A85C4A;
+  --oud:#6E4A2E;
+  --gourmand:#A8632D;
+  --rose:#8C5468;
+  --fresh:#4E7A6C;
+  --amber-tag:#B98A3E;
+  --sandal:#8A6A45;
+  --vetiver:#516B4E;
+  --other:#5A5048;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sans-serif;}
+body{padding:40px 32px 80px;min-height:100vh;}
+.wrap{max-width:1180px;margin:0 auto;}
+
+/* header */
+header.top{margin-bottom:28px;}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;color:var(--gold);text-transform:uppercase;}
+h1.title{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(36px,6vw,54px);margin:6px 0 4px;letter-spacing:-0.01em;}
+.subtitle{color:var(--text-muted);font-size:14.5px;max-width:520px;line-height:1.5;}
+.goldrule{height:1px;background:linear-gradient(90deg,var(--gold),transparent 70%);margin:20px 0 0;}
+
+/* tabs */
+.tabnav{display:flex;border-bottom:1px solid var(--line);margin-bottom:26px;}
+.tabbtn{background:transparent;border:none;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:12.5px;letter-spacing:.04em;padding:11px 4px;margin-right:26px;cursor:pointer;position:relative;top:1px;border-bottom:2px solid transparent;transition:.15s;}
+.tabbtn:hover{color:var(--text);}
+.tabbtn.active{color:var(--amber);border-bottom-color:var(--amber);}
+.tab-panel.hidden{display:none;}
+
+/* profile card */
+.profile{background:var(--surface);border:1px solid var(--line);border-radius:2px;padding:20px 22px;margin:26px 0 30px;position:relative;}
+.profile-head{display:flex;align-items:center;justify-content:space-between;cursor:pointer;}
+.profile-head h2{font-family:'Fraunces',serif;font-weight:500;font-size:17px;margin:0;}
+.profile-head .toggle{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-muted);}
+.profile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:18px;}
+.profile-grid.hidden{display:none;}
+.pfield label{display:block;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;}
+.pfield textarea,.pfield input{width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:2px;font-family:'Work Sans';font-size:13px;resize:vertical;min-height:38px;}
+.pfield textarea:focus,.pfield input:focus{outline:1px solid var(--amber);border-color:var(--amber);}
+.profile-save{margin-top:14px;text-align:right;}
+
+/* toolbar */
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:22px;}
+.search{flex:1;min-width:180px;background:var(--surface);border:1px solid var(--line);color:var(--text);padding:9px 12px;border-radius:2px;font-size:13px;}
+.search:focus{outline:1px solid var(--amber);}
+select.sort{background:var(--surface);border:1px solid var(--line);color:var(--text);padding:9px 10px;border-radius:2px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;}
+.btn{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.03em;padding:9px 16px;border-radius:2px;border:1px solid var(--amber);background:transparent;color:var(--amber);cursor:pointer;transition:.15s;white-space:nowrap;}
+.btn:hover{background:var(--amber);color:#17120F;}
+.btn.primary{background:var(--amber);color:#17120F;}
+.btn.primary:hover{background:#dd8f4e;}
+.btn.ghost{border-color:var(--line);color:var(--text-muted);}
+.btn.ghost:hover{background:var(--surface-2);color:var(--text);}
+
+.tagbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:26px;}
+.tagchip{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);color:var(--text-muted);cursor:pointer;background:transparent;transition:.15s;}
+.tagchip.active{color:#17120F;border-color:transparent;}
+.tagchip[data-tag="Oud"].active{background:var(--oud);color:#EFE7DA;}
+.tagchip[data-tag="Gourmand"].active{background:var(--gourmand);}
+.tagchip[data-tag="Amber"].active{background:var(--amber-tag);}
+.tagchip[data-tag="Rose"].active{background:var(--rose);color:#EFE7DA;}
+.tagchip[data-tag="Fresh"].active{background:var(--fresh);color:#EFE7DA;}
+.tagchip[data-tag="Sandalwood"].active{background:var(--sandal);}
+.tagchip[data-tag="Vetiver"].active{background:var(--vetiver);color:#EFE7DA;}
+.tagchip[data-tag="Other"].active{background:var(--other);color:#EFE7DA;}
+
+/* grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px;}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:3px;position:relative;overflow:hidden;display:flex;flex-direction:column;transition:.2s border-color;}
+.card:hover{border-color:var(--gold);}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;padding:12px 14px 0;}
+.accession{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-muted);letter-spacing:.05em;}
+.seal{width:38px;height:38px;border-radius:50%;border:1px solid var(--gold);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;line-height:1;}
+.seal .n{font-size:12px;font-weight:600;color:var(--amber);}
+.seal .of5{font-size:7px;color:var(--text-muted);}
+.photo{margin:10px 14px 0;aspect-ratio:1/1;background:var(--surface-2);border:1px solid var(--line);border-radius:2px;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.photo img{width:100%;height:100%;object-fit:cover;}
+.photo svg{width:38%;opacity:.35;}
+.card-body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:8px;flex:1;}
+.brand{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);}
+.name{font-family:'Fraunces',serif;font-weight:600;font-size:19px;line-height:1.15;}
+.star-row{position:relative;height:15px;font-size:14px;letter-spacing:2px;line-height:1;font-family:'IBM Plex Mono',monospace;margin-top:-2px;}
+.star-row .bg{color:var(--line);}
+.star-row .fg{position:absolute;top:0;left:0;overflow:hidden;color:var(--amber);white-space:nowrap;}
+.chips{display:flex;flex-wrap:wrap;gap:5px;}
+.chip{font-size:10px;font-family:'IBM Plex Mono',monospace;padding:3px 8px;border-radius:20px;color:#EFE7DA;opacity:.9;}
+.chip.Oud{background:var(--oud);} .chip.Gourmand{background:var(--gourmand);} .chip.Amber{background:var(--amber-tag);color:#17120F;}
+.chip.Rose{background:var(--rose);} .chip.Fresh{background:var(--fresh);} .chip.Sandalwood{background:var(--sandal);color:#17120F;}
+.chip.Vetiver{background:var(--vetiver);} .chip.Other{background:var(--other);}
+
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:4px;}
+.stat{text-align:center;}
+.stat .lbl{font-family:'IBM Plex Mono',monospace;font-size:8.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);display:block;margin-bottom:4px;}
+.dots{display:flex;justify-content:center;gap:2px;}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--line);}
+.dot.on{background:var(--amber);}
+
+.meta-row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;margin-top:2px;}
+.sting{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);}
+.sting.on{color:var(--danger);}
+.notes{font-size:12.5px;color:var(--text-muted);line-height:1.45;margin-top:2px;}
+.card-actions a.lookup{flex:1;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--amber);color:var(--amber);font-family:'IBM Plex Mono',monospace;font-size:11px;padding:7px;border-radius:2px;text-decoration:none;}
+.card-actions a.lookup:hover{background:var(--amber);color:#17120F;}
+.card-actions{display:flex;gap:8px;padding:0 14px 14px;margin-top:auto;flex-wrap:wrap;}
+.card-actions button{flex:1;background:transparent;border:1px solid var(--line);color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:11px;padding:7px;border-radius:2px;cursor:pointer;}
+.card-actions button:hover{border-color:var(--amber);color:var(--amber);}
+.card-actions button.del:hover{border-color:var(--danger);color:var(--danger);}
+
+.empty{grid-column:1/-1;text-align:center;padding:70px 20px;color:var(--text-muted);}
+.empty h3{font-family:'Fraunces',serif;color:var(--text);font-size:20px;margin-bottom:6px;}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(10,8,6,.72);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:50;}
+.overlay.hidden{display:none;}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:3px;max-width:560px;width:100%;padding:28px;margin-top:10px;}
+.modal h2{font-family:'Fraunces',serif;font-weight:600;font-size:22px;margin:0 0 18px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--gold);margin-bottom:6px;}
+.field input,.field textarea,.field select{width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--text);padding:9px 11px;border-radius:2px;font-size:13.5px;font-family:'Work Sans';}
+.field textarea{resize:vertical;min-height:60px;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+.slider-row{display:flex;align-items:center;gap:10px;}
+.slider-row input[type=range]{flex:1;accent-color:var(--amber);}
+.slider-row span{font-family:'IBM Plex Mono',monospace;font-size:12px;width:20px;text-align:center;color:var(--amber);}
+.tagpick{display:flex;flex-wrap:wrap;gap:7px;}
+.tagpick .tagchip{border-color:var(--line);}
+.checkline{display:flex;align-items:center;gap:8px;margin-top:2px;}
+.checkline input{width:auto;}
+.checkline label{font-size:13px;color:var(--text-muted);font-family:'Work Sans';text-transform:none;letter-spacing:0;}
+.photo-upload{display:flex;align-items:center;gap:12px;}
+.photo-preview{width:64px;height:64px;border-radius:2px;background:var(--surface-2);border:1px solid var(--line);object-fit:cover;flex-shrink:0;}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px;}
+.loading{text-align:center;padding:60px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:13px;}
+::placeholder{color:#6e6255;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">A working record of scent</div>
+    <h1 class="title">The Perfumery</h1>
+    <p class="subtitle">Everything you own, rated on your terms &mdash; longevity, projection, and how it actually sits on your skin.</p>
+    <div class="goldrule"></div>
+  </header>
+
+  <div class="profile" id="profileCard">
+    <div class="profile-head" id="profileToggle">
+      <h2>Scent Profile</h2>
+      <span class="toggle" id="profileToggleLabel">show ▾</span>
+    </div>
+    <div class="profile-grid hidden" id="profileGrid">
+      <div class="pfield"><label>Favourite family</label><input id="p_favorite" placeholder="e.g. Gourmand"></div>
+      <div class="pfield"><label>Also drawn to</label><input id="p_also" placeholder="Oud, Amber, Vetiver, Sandalwood"></div>
+      <div class="pfield"><label>Wants for contrast</label><input id="p_variety" placeholder="Fresh / summer, gym-appropriate"></div>
+      <div class="pfield"><label>Format preference</label><input id="p_format" placeholder="EDP / Extrait / Parfum"></div>
+      <div class="pfield"><label>Budget per bottle</label><input id="p_budget" placeholder="₹2,000 – ₹5,000"></div>
+      <div class="pfield" style="grid-column:1/-1;"><label>Non-negotiables</label><textarea id="p_dealbreakers" placeholder="Longevity is essential (humid climate). No alcohol sting on skin."></textarea></div>
+      <div class="pfield" style="grid-column:1/-1;"><label>Open to</label><input id="p_open" placeholder="Not limited to Middle Eastern — open to niche and designer too"></div>
+    </div>
+    <div class="profile-save hidden" id="profileSaveWrap"><button class="btn" id="saveProfile">Save profile</button></div>
+  </div>
+
+  <div class="tabnav" id="tabnav">
+    <button class="tabbtn" data-tab="collection" id="tabBtnCollection">My Collection</button>
+    <button class="tabbtn" data-tab="consider" id="tabBtnConsider">Under Consideration</button>
+  </div>
+
+  <div class="tab-panel" id="panel-collection">
+    <div class="toolbar">
+      <input class="search" id="search" placeholder="Search by name or brand…">
+      <select class="sort" id="sortSel">
+        <option value="rating">Sort: highest rated</option>
+        <option value="new">Sort: recently added</option>
+        <option value="az">Sort: A–Z</option>
+        <option value="price">Sort: price</option>
+      </select>
+      <button class="btn primary" id="addBtn">+ Add perfume</button>
+    </div>
+    <div class="tagbar" id="tagbar"></div>
+    <div id="loadingMsg" class="loading">Opening the perfumery…</div>
+    <div class="grid" id="grid" style="display:none;"></div>
+  </div>
+
+  <div class="tab-panel hidden" id="panel-consider">
+    <p class="subtitle" style="margin-bottom:18px;">Perfumes you're eyeing, with your reasoning and the links you found, so you're not re-researching the same bottle twice.</p>
+    <div class="toolbar">
+      <div style="flex:1;"></div>
+      <button class="btn primary" id="addConsiderBtn">+ Add to consideration</button>
+    </div>
+    <div class="grid" id="considerGrid"></div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="considerOverlay">
+  <div class="modal">
+    <h2 id="considerModalTitle">Add to Under Consideration</h2>
+    <input type="hidden" id="c_editId">
+    <div class="row2">
+      <div class="field"><label>Brand</label><input id="c_brand" placeholder="e.g. Rayhaan"></div>
+      <div class="field"><label>Name</label><input id="c_name" placeholder="e.g. Pacific Aura"></div>
+    </div>
+    <div class="field">
+      <label>Scent families</label>
+      <div class="tagpick" id="c_tagpick"></div>
+    </div>
+    <div class="field">
+      <label>Your take so far</label>
+      <select id="c_verdict">
+        <option value="Considering">Still considering</option>
+        <option value="Leaning yes">Leaning yes</option>
+        <option value="Leaning no">Leaning no</option>
+        <option value="Waiting for a sample">Waiting for a sample</option>
+      </select>
+    </div>
+    <div class="field"><label>Notes — why it's on the list, what it might get wrong</label><textarea id="c_notes" placeholder="Fits the fresh/gym slot, but it's a crowded dupe category and longevity reviews are mixed…"></textarea></div>
+    <div class="field"><label>Shopping link 1</label><input id="c_link1" placeholder="Paste a shopping link…"></div>
+    <div class="field"><label>Shopping link 2</label><input id="c_link2" placeholder="Paste a shopping link…"></div>
+    <div class="field"><label>Shopping link 3</label><input id="c_link3" placeholder="Paste a shopping link…"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="cancelConsiderModal">Cancel</button>
+      <button class="btn primary" id="saveConsiderEntry">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add a perfume</h2>
+
+    <input type="hidden" id="editId">
+    <div class="row2">
+      <div class="field"><label>Brand</label><input id="f_brand" placeholder="e.g. Lattafa"></div>
+      <div class="field"><label>Name</label><input id="f_name" placeholder="e.g. Raghba"></div>
+    </div>
+    <div class="field">
+      <label>Photo</label>
+      <div class="photo-upload">
+        <img id="f_photoPreview" class="photo-preview" src="" style="display:none;">
+        <input type="file" id="f_photoInput" accept="image/*">
+      </div>
+    </div>
+    <div class="field">
+      <label>Scent families</label>
+      <div class="tagpick" id="tagpick"></div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>Format</label>
+        <select id="f_format"><option>EDP</option><option>Extrait/Parfum</option><option>EDT</option><option>Attar / Oil</option></select>
+      </div>
+      <div class="field"><label>Price paid</label><input id="f_price" placeholder="₹3,200"></div>
+      <div class="field"><label>Overall rating</label>
+        <select id="f_overall">
+          <option value="5">★★★★★ 5</option><option value="4.5">★★★★½ 4.5</option><option value="4">★★★★ 4</option>
+          <option value="3.5">★★★½ 3.5</option><option value="3">★★★ 3</option><option value="2.5">★★½ 2.5</option>
+          <option value="2">★★ 2</option><option value="1.5">★1.5</option><option value="1">★1</option>
+        </select>
+      </div>
+    </div>
+    <div class="row3">
+      <div class="field"><label>Longevity <span id="lv_val">3</span>/5</label>
+        <div class="slider-row"><input type="range" min="1" max="5" value="3" id="f_longevity"></div>
+      </div>
+      <div class="field"><label>Projection <span id="pj_val">3</span>/5</label>
+        <div class="slider-row"><input type="range" min="1" max="5" value="3" id="f_projection"></div>
+      </div>
+      <div class="field"><label>Scent quality <span id="sq_val">3</span>/5</label>
+        <div class="slider-row"><input type="range" min="1" max="5" value="3" id="f_quality"></div>
+      </div>
+    </div>
+    <div class="checkline"><input type="checkbox" id="f_sting"><label for="f_sting">Stings / feels harsh with alcohol on skin</label></div>
+    <div class="field" style="margin-top:14px;"><label>Notes</label><textarea id="f_notes" placeholder="Dry-down character, what it reminds you of, anything worth remembering…"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="cancelModal">Cancel</button>
+      <button class="btn primary" id="saveEntry">Save entry</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, setDoc, deleteDoc,
+  collection, query, where, getDocs, documentId
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCDSgYcHNwpwp7s22shANS6qgrYw43UKTU",
+  authDomain: "the-perfumery-a22c4.firebaseapp.com",
+  projectId: "the-perfumery-a22c4",
+  storageBucket: "the-perfumery-a22c4.firebasestorage.app",
+  messagingSenderId: "524277840582",
+  appId: "1:524277840582:web:6a5b93519b946a5608f5c7"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+const KV = 'kv'; // single collection; each storage "key" becomes a document id in here
+
+const FirestoreStore = {
+  async get(key, shared){
+    const snap = await getDoc(doc(db, KV, key));
+    if(!snap.exists()){ throw new Error('not found'); }
+    return {key, value: snap.data().value, shared: !!shared};
+  },
+  async set(key, value, shared){
+    await setDoc(doc(db, KV, key), { value });
+    return {key, value, shared: !!shared};
+  },
+  async delete(key, shared){
+    await deleteDoc(doc(db, KV, key));
+    return {key, deleted:true, shared: !!shared};
+  },
+  async list(prefix, shared){
+    prefix = prefix || '';
+    const q = query(collection(db, KV), where(documentId(), '>=', prefix), where(documentId(), '<', prefix + '\uf8ff'));
+    const snaps = await getDocs(q);
+    const keys = [];
+    snaps.forEach(s=>keys.push(s.id));
+    return {keys, prefix, shared: !!shared};
+  }
+};
+
+const ALL_TAGS = ["Oud","Gourmand","Amber","Rose","Fresh","Sandalwood","Vetiver","Other"];
+let vault = { entries: [], nextNo: 1 };
+let profile = {};
+let activeFilters = new Set();
+let editingId = null;
+let pendingPhoto = null;
+
+function svgBottle(){
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="#A5978A" stroke-width="1.2"><path d="M9 2h6M10 2v3.2c0 .5-.2.9-.5 1.3L8 8.5c-.5.6-.8 1.4-.8 2.2V20a2 2 0 0 0 2 2h5.6a2 2 0 0 0 2-2v-9.3c0-.8-.3-1.6-.8-2.2l-1.5-2c-.3-.4-.5-.8-.5-1.3V2"/></svg>';
+}
+
+async function loadAll(){
+  vault = { entries: [], nextNo: 1 };
+  try{
+    const meta = await FirestoreStore.get('vault-meta', false);
+    if(meta && meta.value) vault.nextNo = JSON.parse(meta.value).nextNo || 1;
+  }catch(e){ /* no meta yet */ }
+  try{
+    const listRes = await FirestoreStore.list('entry:', false);
+    const keys = (listRes && listRes.keys) || [];
+    for(const k of keys){
+      try{
+        const r = await FirestoreStore.get(k, false);
+        if(r && r.value) vault.entries.push(JSON.parse(r.value));
+      }catch(e){ /* skip a single unreadable entry, don't fail the whole load */ }
+    }
+  }catch(e){ /* no entries yet */ }
+  try{
+    const p = await FirestoreStore.get('profile-data', false);
+    if(p && p.value) profile = JSON.parse(p.value);
+  }catch(e){ profile = {}; }
+  fillProfileForm();
+  document.getElementById('loadingMsg').style.display='none';
+  document.getElementById('grid').style.display='grid';
+  buildTagbar();
+  render();
+}
+
+async function saveMeta(){
+  try{ await FirestoreStore.set('vault-meta', JSON.stringify({nextNo: vault.nextNo}), false); }
+  catch(e){ console.error('meta save failed', e); }
+}
+async function saveEntryToStorage(entry){
+  try{ await FirestoreStore.set('entry:'+entry.id, JSON.stringify(entry), false); }
+  catch(e){ console.error('save failed', e); alert('Could not save — please try again.'); }
+}
+async function deleteEntryFromStorage(id){
+  try{ await FirestoreStore.delete('entry:'+id, false); }
+  catch(e){ console.error('delete failed', e); }
+}
+async function saveProfileData(){
+  try{ await FirestoreStore.set('profile-data', JSON.stringify(profile), false); }
+  catch(e){ console.error('save failed', e); }
+}
+
+function fillProfileForm(){
+  document.getElementById('p_favorite').value = profile.favorite || '';
+  document.getElementById('p_also').value = profile.also || '';
+  document.getElementById('p_variety').value = profile.variety || '';
+  document.getElementById('p_format').value = profile.format || '';
+  document.getElementById('p_budget').value = profile.budget || '';
+  document.getElementById('p_dealbreakers').value = profile.dealbreakers || '';
+  document.getElementById('p_open').value = profile.open || '';
+}
+
+document.getElementById('profileToggle').onclick = ()=>{
+  const grid = document.getElementById('profileGrid');
+  const wrap = document.getElementById('profileSaveWrap');
+  const lbl = document.getElementById('profileToggleLabel');
+  const hidden = grid.classList.contains('hidden');
+  grid.classList.toggle('hidden');
+  wrap.classList.toggle('hidden');
+  lbl.textContent = hidden ? 'hide ▴' : 'show ▾';
+};
+document.getElementById('saveProfile').onclick = async ()=>{
+  profile = {
+    favorite: document.getElementById('p_favorite').value,
+    also: document.getElementById('p_also').value,
+    variety: document.getElementById('p_variety').value,
+    format: document.getElementById('p_format').value,
+    budget: document.getElementById('p_budget').value,
+    dealbreakers: document.getElementById('p_dealbreakers').value,
+    open: document.getElementById('p_open').value,
+  };
+  await saveProfileData();
+  const btn = document.getElementById('saveProfile');
+  btn.textContent = 'Saved ✓'; setTimeout(()=>btn.textContent='Save profile',1200);
+};
+
+function buildTagbar(){
+  const bar = document.getElementById('tagbar');
+  bar.innerHTML = ALL_TAGS.map(t=>`<button class="tagchip" data-tag="${t}">${t}</button>`).join('');
+  bar.querySelectorAll('.tagchip').forEach(chip=>{
+    chip.onclick = ()=>{
+      const t = chip.dataset.tag;
+      if(activeFilters.has(t)) activeFilters.delete(t); else activeFilters.add(t);
+      chip.classList.toggle('active');
+      render();
+    };
+  });
+}
+
+function starSeal(v){
+  return `<div class="seal"><span class="n">${v}</span><span class="of5">/ 5</span></div>`;
+}
+function starRow(v){
+  const pct = Math.max(0,Math.min(100,(v/5)*100));
+  return `<div class="star-row"><div class="bg">★★★★★</div><div class="fg" style="width:${pct}%">★★★★★</div></div>`;
+}
+function dots(v){
+  let h='';
+  for(let i=1;i<=5;i++) h+=`<div class="dot ${i<=v?'on':''}"></div>`;
+  return h;
+}
+
+function render(){
+  const grid = document.getElementById('grid');
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const sort = document.getElementById('sortSel').value;
+  let list = vault.entries.filter(e=>{
+    const matchesQ = !q || (e.brand+' '+e.name).toLowerCase().includes(q);
+    const matchesTag = activeFilters.size===0 || e.tags.some(t=>activeFilters.has(t));
+    return matchesQ && matchesTag;
+  });
+  if(sort==='rating') list.sort((a,b)=>b.overall-a.overall);
+  else if(sort==='new') list.sort((a,b)=>b.no-a.no);
+  else if(sort==='az') list.sort((a,b)=>(a.brand+a.name).localeCompare(b.brand+b.name));
+  else if(sort==='price') list.sort((a,b)=>(parseFloat((a.price||'0').replace(/[^0-9.]/g,''))||0)-(parseFloat((b.price||'0').replace(/[^0-9.]/g,''))||0));
+
+  if(list.length===0){
+    grid.innerHTML = `<div class="empty"><h3>Nothing here yet</h3><p>Add the first bottle to start the record.</p></div>`;
+    return;
+  }
+  grid.innerHTML = list.map(e=>`
+    <div class="card">
+      <div class="card-top">
+        <span class="accession">No. ${String(e.no).padStart(3,'0')}</span>
+        ${starSeal(e.overall)}
+      </div>
+      <div class="photo">${e.photo?`<img src="${e.photo}">`:svgBottle()}</div>
+      <div class="card-body">
+        <div>
+          <div class="brand">${e.brand}</div>
+          <div class="name">${e.name}</div>
+          ${starRow(e.overall)}
+        </div>
+        <div class="chips">${e.tags.map(t=>`<span class="chip ${t}">${t}</span>`).join('')}</div>
+        <div class="stats">
+          <div class="stat"><span class="lbl">Longevity</span><div class="dots">${dots(e.longevity)}</div></div>
+          <div class="stat"><span class="lbl">Projection</span><div class="dots">${dots(e.projection)}</div></div>
+          <div class="stat"><span class="lbl">Quality</span><div class="dots">${dots(e.quality)}</div></div>
+        </div>
+        <div class="meta-row"><span>${e.format||''}</span><span>${e.price||''}</span></div>
+        <div class="sting ${e.sting?'on':''}">${e.sting?'⚠ alcohol sting':'✓ sits clean on skin'}</div>
+        ${e.notes?`<div class="notes">${e.notes}</div>`:''}
+      </div>
+      <div class="card-actions">
+        <a class="lookup" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(e.brand+' '+e.name+' perfume price')}">Look up online ↗</a>
+        <button class="edit" data-id="${e.id}">Edit</button>
+        <button class="del" data-id="${e.id}">Remove</button>
+      </div>
+    </div>
+  `).join('');
+
+  grid.querySelectorAll('.edit').forEach(b=>b.onclick=()=>openModal(b.dataset.id));
+  grid.querySelectorAll('.del').forEach(b=>b.onclick=()=>removeEntry(b.dataset.id));
+}
+
+document.getElementById('search').oninput = render;
+document.getElementById('sortSel').onchange = render;
+
+function buildTagpick(selected, containerId){
+  containerId = containerId || 'tagpick';
+  const el = document.getElementById(containerId);
+  el.innerHTML = ALL_TAGS.map(t=>`<button type="button" class="tagchip" data-tag="${t}">${t}</button>`).join('');
+  el.querySelectorAll('.tagchip').forEach(chip=>{
+    if(selected.includes(chip.dataset.tag)) chip.classList.add('active');
+    chip.onclick = ()=>chip.classList.toggle('active');
+  });
+}
+function getPickedTags(containerId){
+  containerId = containerId || 'tagpick';
+  return [...document.querySelectorAll('#'+containerId+' .tagchip.active')].map(c=>c.dataset.tag);
+}
+
+['f_longevity','f_projection','f_quality'].forEach((id,i)=>{
+  const outIds=['lv_val','pj_val','sq_val'];
+  document.getElementById(id).oninput=(e)=>{document.getElementById(outIds[i]).textContent=e.target.value;};
+});
+
+document.getElementById('f_photoInput').onchange = (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const img = new Image();
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    img.onload = ()=>{
+      const maxDim = 480;
+      let w=img.width,h=img.height;
+      if(w>h){ if(w>maxDim){h=h*maxDim/w;w=maxDim;} } else { if(h>maxDim){w=w*maxDim/h;h=maxDim;} }
+      const canvas = document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      pendingPhoto = canvas.toDataURL('image/jpeg',0.72);
+      const prev = document.getElementById('f_photoPreview');
+      prev.src = pendingPhoto; prev.style.display='block';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+function openModal(id){
+  editingId = id || null;
+  pendingPhoto = null;
+  const e = id ? vault.entries.find(x=>x.id===id) : null;
+  document.getElementById('modalTitle').textContent = e ? 'Edit perfume' : 'Add a perfume';
+  document.getElementById('f_brand').value = e?.brand || '';
+  document.getElementById('f_name').value = e?.name || '';
+  document.getElementById('f_format').value = e?.format || 'EDP';
+  document.getElementById('f_price').value = e?.price || '';
+  document.getElementById('f_overall').value = e?.overall || 4;
+  document.getElementById('f_longevity').value = e?.longevity || 3;
+  document.getElementById('lv_val').textContent = e?.longevity || 3;
+  document.getElementById('f_projection').value = e?.projection || 3;
+  document.getElementById('pj_val').textContent = e?.projection || 3;
+  document.getElementById('f_quality').value = e?.quality || 3;
+  document.getElementById('sq_val').textContent = e?.quality || 3;
+  document.getElementById('f_sting').checked = e?.sting || false;
+  document.getElementById('f_notes').value = e?.notes || '';
+  const prev = document.getElementById('f_photoPreview');
+  if(e?.photo){ prev.src = e.photo; prev.style.display='block'; pendingPhoto = e.photo; }
+  else { prev.style.display='none'; prev.src=''; }
+  buildTagpick(e?.tags || []);
+  document.getElementById('overlay').classList.remove('hidden');
+}
+document.getElementById('addBtn').onclick = ()=>openModal(null);
+document.getElementById('cancelModal').onclick = ()=>document.getElementById('overlay').classList.add('hidden');
+
+document.getElementById('saveEntry').onclick = async ()=>{
+  const brand = document.getElementById('f_brand').value.trim();
+  const name = document.getElementById('f_name').value.trim();
+  if(!brand || !name){ alert('Brand and name are needed to file this entry.'); return; }
+  const data = {
+    brand, name,
+    photo: pendingPhoto,
+    tags: getPickedTags(),
+    format: document.getElementById('f_format').value,
+    price: document.getElementById('f_price').value.trim(),
+    overall: parseFloat(document.getElementById('f_overall').value),
+    longevity: parseInt(document.getElementById('f_longevity').value),
+    projection: parseInt(document.getElementById('f_projection').value),
+    quality: parseInt(document.getElementById('f_quality').value),
+    sting: document.getElementById('f_sting').checked,
+    notes: document.getElementById('f_notes').value.trim(),
+  };
+  if(editingId){
+    const idx = vault.entries.findIndex(x=>x.id===editingId);
+    vault.entries[idx] = {...vault.entries[idx], ...data};
+    await saveEntryToStorage(vault.entries[idx]);
+  } else {
+    const newEntry = {id:'p'+Date.now(), no: vault.nextNo++, ...data};
+    vault.entries.push(newEntry);
+    await saveEntryToStorage(newEntry);
+    await saveMeta();
+  }
+  document.getElementById('overlay').classList.add('hidden');
+  render();
+};
+
+async function removeEntry(id){
+  if(!confirm('Remove this entry?')) return;
+  vault.entries = vault.entries.filter(e=>e.id!==id);
+  await deleteEntryFromStorage(id);
+  render();
+}
+
+async function migrateOldData(){
+  try{
+    const old = await FirestoreStore.get('vault-data', false);
+    if(old && old.value){
+      const parsed = JSON.parse(old.value);
+      for(const entry of (parsed.entries||[])){ await saveEntryToStorage(entry); }
+      vault.nextNo = parsed.nextNo || vault.nextNo;
+      await saveMeta();
+      try{ await FirestoreStore.delete('vault-data', false); }catch(e){}
+      return true;
+    }
+  }catch(e){ /* nothing old to migrate */ }
+  return false;
+}
+
+async function seedIfEmpty(){
+  try{
+    const listRes = await FirestoreStore.list('entry:', false);
+    if(listRes && listRes.keys && listRes.keys.length>0) return;
+  }catch(e){ /* no entries yet, proceed to seed */ }
+  vault = {
+    nextNo: 12,
+    entries: [
+      {id:'s1',no:1,brand:'Zimaya',name:'Sharaf Blend',photo:null,tags:['Oud','Amber'],format:'EDP',price:'',overall:4.5,longevity:5,projection:5,quality:5,sting:false,notes:'Strong all-round performer — longevity, projection and scent quality all land well.'},
+      {id:'s2',no:2,brand:'Lattafa',name:'Ameer Al Oud Intense Oud',photo:null,tags:['Oud'],format:'EDP',price:'',overall:3,longevity:2,projection:2,quality:3,sting:false,notes:'Weak longevity and projection.'},
+      {id:'s3',no:3,brand:'Afnan',name:'Turathi Blue',photo:null,tags:['Fresh','Amber'],format:'EDP',price:'',overall:3.5,longevity:1,projection:1,quality:3,sting:false,notes:'Feels synthetic. No real longevity or projection.'},
+      {id:'s4',no:4,brand:'Khadlaj',name:'Island',photo:null,tags:['Fresh','Other'],format:'EDP',price:'',overall:4,longevity:4,projection:4,quality:4,sting:false,notes:'Very different scent profile from the rest of the collection — a plus, not a caveat.'},
+      {id:'s5',no:5,brand:'Rayhaan',name:'Wolf',photo:null,tags:['Other'],format:'EDP',price:'',overall:3.5,longevity:2,projection:2,quality:3,sting:false,notes:'Rated 3.5 specifically because of longevity — not a scent quality problem.'},
+      {id:'s6',no:6,brand:'Lattafa',name:'Teriaq Intense',photo:null,tags:['Oud','Amber'],format:'EDP',price:'',overall:4,longevity:4,projection:4,quality:4,sting:false,notes:'Consistently good across the board.'},
+      {id:'s7',no:7,brand:'Ahmad Al Maghribi',name:'Bin Shaikh',photo:null,tags:['Oud','Amber'],format:'EDP',price:'',overall:4.5,longevity:5,projection:5,quality:5,sting:false,notes:'Unique dry-down — a standout in the collection.'},
+      {id:'s8',no:8,brand:'Lattafa',name:'Raghba',photo:null,tags:['Sandalwood','Amber'],format:'EDP',price:'',overall:4,longevity:4,projection:4,quality:4,sting:false,notes:'Loves the sandalwood base specifically in this one — not a blanket sandalwood preference.'},
+      {id:'s9',no:9,brand:'Rasasi',name:'Hawas Kobra',photo:null,tags:['Other'],format:'EDP',price:'',overall:3.5,longevity:2,projection:2,quality:3,sting:false,notes:'Weak longevity and projection.'},
+      {id:'s10',no:10,brand:'Neesh',name:'Milky Way',photo:null,tags:['Gourmand'],format:'EDP',price:'',overall:2.5,longevity:3,projection:1,quality:2,sting:false,notes:'Very hyped but projection fades after an hour.'},
+      {id:'s11',no:11,brand:'Neesh',name:'Glazed Water',photo:null,tags:['Fresh','Gourmand'],format:'EDP',price:'',overall:2.5,longevity:2,projection:1,quality:2,sting:false,notes:'Forgettable.'},
+    ]
+  };
+  for(const entry of vault.entries){ await saveEntryToStorage(entry); }
+  await saveMeta();
+  profile = {
+    favorite:'Gourmand — sweet, intense, captivating',
+    also:'Oud, Amber, Vetiver, Sandalwood',
+    variety:'Fresh / summer scents (watermelon, pineapple, iris) for gym wear — subtle but intentional',
+    format:'EDP / Extrait / Parfum',
+    budget:'₹2,000 – ₹5,000',
+    dealbreakers:'Longevity is essential — Kerala humidity kills weak scents fast. No alcohol sting on skin.',
+    open:'Not limited to Middle Eastern — open to niche and designer too, going forward.'
+  };
+  await saveProfileData();
+}
+
+let considerations = { entries: [], nextNo: 1 };
+
+async function saveConsiderMeta(){
+  try{ await FirestoreStore.set('consider-meta', JSON.stringify({nextNo: considerations.nextNo}), false); }
+  catch(e){ console.error('consider meta save failed', e); }
+}
+async function saveConsiderEntryToStorage(entry){
+  try{ await FirestoreStore.set('consider:'+entry.id, JSON.stringify(entry), false); }
+  catch(e){ console.error('save failed', e); alert('Could not save — please try again.'); }
+}
+async function deleteConsiderEntryFromStorage(id){
+  try{ await FirestoreStore.delete('consider:'+id, false); }
+  catch(e){ console.error('delete failed', e); }
+}
+async function loadConsiderations(){
+  considerations = { entries: [], nextNo: 1 };
+  try{
+    const meta = await FirestoreStore.get('consider-meta', false);
+    if(meta && meta.value) considerations.nextNo = JSON.parse(meta.value).nextNo || 1;
+  }catch(e){ /* no meta yet */ }
+  try{
+    const listRes = await FirestoreStore.list('consider:', false);
+    const keys = (listRes && listRes.keys) || [];
+    for(const k of keys){
+      try{
+        const r = await FirestoreStore.get(k, false);
+        if(r && r.value) considerations.entries.push(JSON.parse(r.value));
+      }catch(e){ /* skip a single unreadable entry */ }
+    }
+  }catch(e){ /* no entries yet */ }
+  renderConsiderations();
+}
+
+function safeUrl(u){
+  if(!u) return '#';
+  return /^https?:\/\//i.test(u) ? u : 'https://'+u;
+}
+function linkRow(e){
+  const links = [e.link1, e.link2, e.link3].filter(Boolean);
+  if(links.length===0) return '';
+  return `<div class="chips">${links.map((l,i)=>`<a class="chip Other" style="text-decoration:none;" target="_blank" rel="noopener" href="${safeUrl(l)}">Link ${i+1} ↗</a>`).join('')}</div>`;
+}
+function verdictClass(v){
+  if(v==='Leaning yes') return 'Fresh';
+  if(v==='Leaning no') return 'Other';
+  if(v==='Waiting for a sample') return 'Sandalwood';
+  return 'Amber';
+}
+
+function renderConsiderations(){
+  const grid = document.getElementById('considerGrid');
+  if(considerations.entries.length===0){
+    grid.innerHTML = `<div class="empty"><h3>Nothing on the list yet</h3><p>Add a perfume you're eyeing before you buy it.</p></div>`;
+    return;
+  }
+  const list = [...considerations.entries].sort((a,b)=>b.no-a.no);
+  grid.innerHTML = list.map(e=>`
+    <div class="card">
+      <div class="card-top">
+        <span class="accession">No. C${String(e.no).padStart(3,'0')}</span>
+        <span class="chip ${verdictClass(e.verdict)}">${e.verdict||'Considering'}</span>
+      </div>
+      <div class="card-body">
+        <div>
+          <div class="brand">${e.brand}</div>
+          <div class="name">${e.name}</div>
+        </div>
+        <div class="chips">${(e.tags||[]).map(t=>`<span class="chip ${t}">${t}</span>`).join('')}</div>
+        ${e.notes?`<div class="notes">${e.notes}</div>`:''}
+        ${linkRow(e)}
+      </div>
+      <div class="card-actions">
+        <button class="edit" data-id="${e.id}">Edit</button>
+        <button class="del" data-id="${e.id}">Remove</button>
+      </div>
+    </div>
+  `).join('');
+  grid.querySelectorAll('.edit').forEach(b=>b.onclick=()=>openConsiderModal(b.dataset.id));
+  grid.querySelectorAll('.del').forEach(b=>b.onclick=()=>removeConsiderEntry(b.dataset.id));
+}
+
+function openConsiderModal(id){
+  const e = id ? considerations.entries.find(x=>x.id===id) : null;
+  document.getElementById('c_editId').value = id || '';
+  document.getElementById('considerModalTitle').textContent = e ? 'Edit consideration' : 'Add to Under Consideration';
+  document.getElementById('c_brand').value = e?.brand || '';
+  document.getElementById('c_name').value = e?.name || '';
+  document.getElementById('c_verdict').value = e?.verdict || 'Considering';
+  document.getElementById('c_notes').value = e?.notes || '';
+  document.getElementById('c_link1').value = e?.link1 || '';
+  document.getElementById('c_link2').value = e?.link2 || '';
+  document.getElementById('c_link3').value = e?.link3 || '';
+  buildTagpick(e?.tags || [], 'c_tagpick');
+  document.getElementById('considerOverlay').classList.remove('hidden');
+}
+document.getElementById('addConsiderBtn').onclick = ()=>openConsiderModal(null);
+document.getElementById('cancelConsiderModal').onclick = ()=>document.getElementById('considerOverlay').classList.add('hidden');
+
+document.getElementById('saveConsiderEntry').onclick = async ()=>{
+  const brand = document.getElementById('c_brand').value.trim();
+  const name = document.getElementById('c_name').value.trim();
+  if(!brand || !name){ alert('Brand and name are needed to add this to the list.'); return; }
+  const editId = document.getElementById('c_editId').value;
+  const data = {
+    brand, name,
+    tags: getPickedTags('c_tagpick'),
+    verdict: document.getElementById('c_verdict').value,
+    notes: document.getElementById('c_notes').value.trim(),
+    link1: document.getElementById('c_link1').value.trim(),
+    link2: document.getElementById('c_link2').value.trim(),
+    link3: document.getElementById('c_link3').value.trim(),
+  };
+  if(editId){
+    const idx = considerations.entries.findIndex(x=>x.id===editId);
+    considerations.entries[idx] = {...considerations.entries[idx], ...data};
+    await saveConsiderEntryToStorage(considerations.entries[idx]);
+  } else {
+    const newEntry = {id:'c'+Date.now(), no: considerations.nextNo++, ...data};
+    considerations.entries.push(newEntry);
+    await saveConsiderEntryToStorage(newEntry);
+    await saveConsiderMeta();
+  }
+  document.getElementById('considerOverlay').classList.add('hidden');
+  renderConsiderations();
+};
+
+async function removeConsiderEntry(id){
+  if(!confirm('Remove this from Under Consideration?')) return;
+  considerations.entries = considerations.entries.filter(e=>e.id!==id);
+  await deleteConsiderEntryFromStorage(id);
+  renderConsiderations();
+}
+
+async function seedConsiderIfEmpty(){
+  try{
+    const listRes = await FirestoreStore.list('consider:', false);
+    if(listRes && listRes.keys && listRes.keys.length>0) return;
+  }catch(e){ /* proceed to seed */ }
+  const seedList = [
+    {id:'c1',no:1,brand:'Rayhaan',name:'Pacific Aura',tags:['Fresh'],verdict:'Considering',
+      notes:`Fits the fresh / gym / summer slot. Fresh-citrus-mint opening, amber-fig-ambroxan base. Reviews are mixed on longevity (4-5 hrs to all-day depending on skin and batch), and it's widely noted as a dupe of LV Pacific Chill — near-identical to a few other clones. Competent, but not distinctive.`,
+      link1:'',link2:'',link3:''},
+    {id:'c2',no:2,brand:'Armaf',name:'Club de Nuit Intense Man',tags:['Fresh','Other'],verdict:'Considering',
+      notes:`Pineapple, blackcurrant and apple top notes with a smoky-fruity dry-down — genuinely distinctive, not just clean freshness. Known for exceptional longevity and projection at this price point. Caveat: it's an EDT, not EDP/Extrait, and can project stronger than gym-subtle if sprayed heavy.`,
+      link1:'',link2:'',link3:''},
+    {id:'c3',no:3,brand:'Lattafa',name:'Najdia Intense',tags:['Fresh'],verdict:'Considering',
+      notes:`Fresh marine-woody profile with reported genuine longevity. Closer to the subtle-but-intentional gym register than Pacific Aura, without the fruity punch of the Armaf pick.`,
+      link1:'',link2:'',link3:''},
+  ];
+  considerations.nextNo = 4;
+  for(const entry of seedList){ await saveConsiderEntryToStorage(entry); }
+  await saveConsiderMeta();
+}
+
+function switchTab(tab){
+  document.getElementById('panel-collection').classList.toggle('hidden', tab!=='collection');
+  document.getElementById('panel-consider').classList.toggle('hidden', tab!=='consider');
+  document.getElementById('tabBtnCollection').classList.toggle('active', tab==='collection');
+  document.getElementById('tabBtnConsider').classList.toggle('active', tab==='consider');
+  try{ FirestoreStore.set('ui-active-tab', tab, false); }catch(e){}
+}
+document.getElementById('tabBtnCollection').onclick = ()=>switchTab('collection');
+document.getElementById('tabBtnConsider').onclick = ()=>switchTab('consider');
+
+(async ()=>{
+  const migrated = await migrateOldData();
+  if(!migrated) await seedIfEmpty();
+  await loadAll();
+  await seedConsiderIfEmpty();
+  await loadConsiderations();
+  let startTab = 'consider';
+  try{
+    const t = await FirestoreStore.get('ui-active-tab', false);
+    if(t && t.value) startTab = t.value;
+  }catch(e){ /* first visit, default to consider */ }
+  switchTab(startTab);
+})();
+</script>
+</body>
+</html>
