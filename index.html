@@ -92,10 +92,11 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .card-body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:8px;flex:1;}
 .brand{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);}
 .name{font-family:'Fraunces',serif;font-weight:600;font-size:19px;line-height:1.15;}
-.star-row{display:flex;gap:1px;margin-top:-2px;}
-.star-cell{position:relative;display:inline-block;width:14px;height:15px;font-size:14px;line-height:1;font-family:'IBM Plex Mono',monospace;}
-.star-bg{position:absolute;top:0;left:0;color:var(--line);}
-.star-fg{position:absolute;top:0;left:0;overflow:hidden;color:var(--amber);white-space:nowrap;}
+.star-row{display:flex;gap:2px;margin-top:-2px;}
+.star-cell{position:relative;display:inline-block;width:15px;height:15px;}
+.star-svg{position:absolute;top:0;left:0;width:15px;height:15px;}
+.star-bg path{fill:var(--line);}
+.star-fg path{fill:var(--amber);}
 .chips{display:flex;flex-wrap:wrap;gap:5px;}
 .chip{font-size:10px;font-family:'IBM Plex Mono',monospace;padding:3px 8px;border-radius:20px;color:#EFE7DA;opacity:.9;background:var(--other);}
 .chip.Oud{background:var(--oud);} .chip.Gourmand{background:var(--gourmand);} .chip.Amber{background:var(--amber-tag);color:#17120F;}
@@ -479,13 +480,17 @@ function buildTagbar(){
   });
 }
 
+const STAR_PATH = "M12 1.5 15.09 8.26 22.5 9.27 17.25 14.14 18.68 21.75 12 18.02 5.32 21.75 6.75 14.14 1.5 9.27 8.91 8.26 Z";
 function starRow(v){
   v = Number(v) || 0;
   let out = '<div class="star-row">';
   for(let i=1;i<=5;i++){
     const remaining = v - (i-1);
     const pct = remaining >= 1 ? 100 : (remaining >= 0.5 ? 50 : 0);
-    out += `<span class="star-cell"><span class="star-bg">★</span><span class="star-fg" style="width:${pct}%">★</span></span>`;
+    out += `<span class="star-cell">
+      <svg class="star-svg star-bg" viewBox="0 0 24 24"><path d="${STAR_PATH}"/></svg>
+      <svg class="star-svg star-fg" viewBox="0 0 24 24" style="clip-path:inset(0 ${100-pct}% 0 0)"><path d="${STAR_PATH}"/></svg>
+    </span>`;
   }
   out += '</div>';
   return out;
