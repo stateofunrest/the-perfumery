@@ -70,7 +70,7 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 
 .tagbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:26px;}
 .tagchip{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);color:var(--text-muted);cursor:pointer;background:transparent;transition:.15s;}
-.tagchip.active{color:#17120F;border-color:transparent;}
+.tagchip.active{color:#17120F;border-color:transparent;background:var(--amber);}
 .tagchip[data-tag="Oud"].active{background:var(--oud);color:#EFE7DA;}
 .tagchip[data-tag="Gourmand"].active{background:var(--gourmand);}
 .tagchip[data-tag="Amber"].active{background:var(--amber-tag);}
@@ -99,7 +99,7 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .star-row .bg{color:var(--line);}
 .star-row .fg{position:absolute;top:0;left:0;overflow:hidden;color:var(--amber);white-space:nowrap;}
 .chips{display:flex;flex-wrap:wrap;gap:5px;}
-.chip{font-size:10px;font-family:'IBM Plex Mono',monospace;padding:3px 8px;border-radius:20px;color:#EFE7DA;opacity:.9;}
+.chip{font-size:10px;font-family:'IBM Plex Mono',monospace;padding:3px 8px;border-radius:20px;color:#EFE7DA;opacity:.9;background:var(--other);}
 .chip.Oud{background:var(--oud);} .chip.Gourmand{background:var(--gourmand);} .chip.Amber{background:var(--amber-tag);color:#17120F;}
 .chip.Rose{background:var(--rose);} .chip.Fresh{background:var(--fresh);} .chip.Sandalwood{background:var(--sandal);color:#17120F;}
 .chip.Vetiver{background:var(--vetiver);} .chip.Other{background:var(--other);}
@@ -141,6 +141,10 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .slider-row span{font-family:'IBM Plex Mono',monospace;font-size:12px;width:20px;text-align:center;color:var(--amber);}
 .tagpick{display:flex;flex-wrap:wrap;gap:7px;}
 .tagpick .tagchip{border-color:var(--line);}
+.newtag-row{display:none;gap:8px;margin-top:8px;}
+.newtag-row.show{display:flex;}
+.newtag-row input{flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--text);padding:6px 9px;border-radius:2px;font-size:12.5px;}
+.newtag-row button{background:var(--amber);border:none;color:#17120F;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:6px 12px;border-radius:2px;cursor:pointer;white-space:nowrap;}
 .checkline{display:flex;align-items:center;gap:8px;margin-top:2px;}
 .checkline input{width:auto;}
 .checkline label{font-size:13px;color:var(--text-muted);font-family:'Work Sans';text-transform:none;letter-spacing:0;}
@@ -187,7 +191,8 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
       <input class="search" id="search" placeholder="Search by name or brand…">
       <select class="sort" id="sortSel">
         <option value="rating">Sort: highest rated</option>
-        <option value="new">Sort: recently added</option>
+        <option value="new">Sort: newest first</option>
+        <option value="old">Sort: oldest first</option>
         <option value="az">Sort: A–Z</option>
         <option value="price">Sort: price</option>
       </select>
@@ -217,8 +222,19 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
       <div class="field"><label>Name</label><input id="c_name" placeholder="e.g. Pacific Aura"></div>
     </div>
     <div class="field">
+      <label>Photo</label>
+      <div class="photo-upload">
+        <img id="c_photoPreview" class="photo-preview" src="" style="display:none;">
+        <input type="file" id="c_photoInput" accept="image/*">
+      </div>
+    </div>
+    <div class="field">
       <label>Scent families</label>
       <div class="tagpick" id="c_tagpick"></div>
+      <div class="newtag-row" id="c_newtag_row">
+        <input id="c_newtag_input" placeholder="Name the new scent family…" maxlength="24">
+        <button type="button" id="c_newtag_add">Add</button>
+      </div>
     </div>
     <div class="field">
       <label>Your take so far</label>
@@ -259,6 +275,10 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
     <div class="field">
       <label>Scent families</label>
       <div class="tagpick" id="tagpick"></div>
+      <div class="newtag-row" id="newtag_row">
+        <input id="newtag_input" placeholder="Name the new scent family…" maxlength="24">
+        <button type="button" id="newtag_add">Add</button>
+      </div>
     </div>
     <div class="row3">
       <div class="field"><label>Format</label>
@@ -274,17 +294,18 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
       </div>
     </div>
     <div class="row3">
-      <div class="field"><label>Longevity <span id="lv_val">3</span>/5</label>
-        <div class="slider-row"><input type="range" min="1" max="5" value="3" id="f_longevity"></div>
+      <div class="field"><label>Longevity <span id="lv_val">1</span>/5</label>
+        <div class="slider-row"><input type="range" min="1" max="5" value="1" id="f_longevity"></div>
       </div>
-      <div class="field"><label>Projection <span id="pj_val">3</span>/5</label>
-        <div class="slider-row"><input type="range" min="1" max="5" value="3" id="f_projection"></div>
+      <div class="field"><label>Projection <span id="pj_val">1</span>/5</label>
+        <div class="slider-row"><input type="range" min="1" max="5" value="1" id="f_projection"></div>
       </div>
-      <div class="field"><label>Scent quality <span id="sq_val">3</span>/5</label>
-        <div class="slider-row"><input type="range" min="1" max="5" value="3" id="f_quality"></div>
+      <div class="field"><label>Scent quality <span id="sq_val">1</span>/5</label>
+        <div class="slider-row"><input type="range" min="1" max="5" value="1" id="f_quality"></div>
       </div>
     </div>
-    <div class="checkline"><input type="checkbox" id="f_sting"><label for="f_sting">Stings / feels harsh with alcohol on skin</label></div>
+    <div class="checkline"><input type="radio" name="stingChoice" id="f_stingYes" value="sting"><label for="f_stingYes">Stings / feels harsh with alcohol on skin</label></div>
+    <div class="checkline" style="margin-top:6px;"><input type="radio" name="stingChoice" id="f_stingNo" value="clean"><label for="f_stingNo">Sits clean on skin</label></div>
     <div class="field" style="margin-top:14px;"><label>Notes</label><textarea id="f_notes" placeholder="Dry-down character, what it reminds you of, anything worth remembering…"></textarea></div>
     <div class="modal-actions">
       <button class="btn ghost" id="cancelModal">Cancel</button>
@@ -336,12 +357,32 @@ const FirestoreStore = {
   }
 };
 
-const ALL_TAGS = ["Oud","Gourmand","Amber","Rose","Fresh","Sandalwood","Vetiver","Other"];
+const BASE_TAGS = ["Oud","Gourmand","Amber","Rose","Fresh","Sandalwood","Vetiver"];
+const OTHER_TAG = "Other";
+let customTags = [];
+function getAllTags(){ return [...BASE_TAGS, ...customTags, OTHER_TAG]; }
+async function loadCustomTags(){
+  try{
+    const snap = await FirestoreStore.get('custom-tags', false);
+    if(snap && snap.value) customTags = JSON.parse(snap.value);
+  }catch(e){ customTags = []; }
+}
+async function addCustomTag(name){
+  name = (name||'').trim();
+  if(!name) return null;
+  // avoid duplicates against base tags, other, or existing custom tags (case-insensitive)
+  const exists = getAllTags().some(t=>t.toLowerCase()===name.toLowerCase());
+  if(exists) return name;
+  customTags.push(name);
+  try{ await FirestoreStore.set('custom-tags', JSON.stringify(customTags), false); }catch(e){ console.error('could not save new tag', e); }
+  return name;
+}
 let vault = { entries: [], nextNo: 1 };
 let profile = {};
 let activeFilters = new Set();
 let editingId = null;
 let pendingPhoto = null;
+let pendingConsiderPhoto = null;
 
 function svgBottle(){
   return '<svg viewBox="0 0 24 24" fill="none" stroke="#A5978A" stroke-width="1.2"><path d="M9 2h6M10 2v3.2c0 .5-.2.9-.5 1.3L8 8.5c-.5.6-.8 1.4-.8 2.2V20a2 2 0 0 0 2 2h5.6a2 2 0 0 0 2-2v-9.3c0-.8-.3-1.6-.8-2.2l-1.5-2c-.3-.4-.5-.8-.5-1.3V2"/></svg>';
@@ -367,6 +408,8 @@ async function loadAll(){
     const p = await FirestoreStore.get('profile-data', false);
     if(p && p.value) profile = JSON.parse(p.value);
   }catch(e){ profile = {}; }
+  await loadCustomTags();
+  await restoreSortPref();
   fillProfileForm();
   document.getElementById('loadingMsg').style.display='none';
   document.getElementById('grid').style.display='grid';
@@ -427,7 +470,7 @@ document.getElementById('saveProfile').onclick = async ()=>{
 
 function buildTagbar(){
   const bar = document.getElementById('tagbar');
-  bar.innerHTML = ALL_TAGS.map(t=>`<button class="tagchip" data-tag="${t}">${t}</button>`).join('');
+  bar.innerHTML = getAllTags().map(t=>`<button class="tagchip" data-tag="${t}">${t}</button>`).join('');
   bar.querySelectorAll('.tagchip').forEach(chip=>{
     chip.onclick = ()=>{
       const t = chip.dataset.tag;
@@ -439,7 +482,7 @@ function buildTagbar(){
 }
 
 function starSeal(v){
-  return `<div class="seal"><span class="n">${v}</span><span class="of5">/ 5</span></div>`;
+  return `<div class="seal"><span class="n">★${v}</span><span class="of5">/ 5</span></div>`;
 }
 function starRow(v){
   const pct = Math.max(0,Math.min(100,(v/5)*100));
@@ -462,6 +505,7 @@ function render(){
   });
   if(sort==='rating') list.sort((a,b)=>b.overall-a.overall);
   else if(sort==='new') list.sort((a,b)=>b.no-a.no);
+  else if(sort==='old') list.sort((a,b)=>a.no-b.no);
   else if(sort==='az') list.sort((a,b)=>(a.brand+a.name).localeCompare(b.brand+b.name));
   else if(sort==='price') list.sort((a,b)=>(parseFloat((a.price||'0').replace(/[^0-9.]/g,''))||0)-(parseFloat((b.price||'0').replace(/[^0-9.]/g,''))||0));
 
@@ -505,17 +549,52 @@ function render(){
 }
 
 document.getElementById('search').oninput = render;
-document.getElementById('sortSel').onchange = render;
+document.getElementById('sortSel').onchange = ()=>{
+  render();
+  try{ FirestoreStore.set('ui-sort', document.getElementById('sortSel').value, false); }catch(e){}
+};
+async function restoreSortPref(){
+  try{
+    const s = await FirestoreStore.get('ui-sort', false);
+    if(s && s.value) document.getElementById('sortSel').value = s.value;
+  }catch(e){ /* default sort stands */ }
+}
 
 function buildTagpick(selected, containerId){
   containerId = containerId || 'tagpick';
+  const rowId = containerId==='tagpick' ? 'newtag_row' : 'c_newtag_row';
+  const inputId = containerId==='tagpick' ? 'newtag_input' : 'c_newtag_input';
   const el = document.getElementById(containerId);
-  el.innerHTML = ALL_TAGS.map(t=>`<button type="button" class="tagchip" data-tag="${t}">${t}</button>`).join('');
+  const row = document.getElementById(rowId);
+  el.innerHTML = getAllTags().map(t=>`<button type="button" class="tagchip" data-tag="${t}">${t}</button>`).join('');
+  row.classList.remove('show');
+  document.getElementById(inputId).value = '';
   el.querySelectorAll('.tagchip').forEach(chip=>{
     if(selected.includes(chip.dataset.tag)) chip.classList.add('active');
-    chip.onclick = ()=>chip.classList.toggle('active');
+    chip.onclick = ()=>{
+      chip.classList.toggle('active');
+      if(chip.dataset.tag === OTHER_TAG){
+        row.classList.toggle('show');
+        if(row.classList.contains('show')) document.getElementById(inputId).focus();
+      }
+    };
   });
 }
+async function handleNewTagAdd(containerId){
+  const inputId = containerId==='tagpick' ? 'newtag_input' : 'c_newtag_input';
+  const input = document.getElementById(inputId);
+  const name = input.value.trim();
+  if(!name) return;
+  const currentlySelected = getPickedTags(containerId).filter(t=>t!==OTHER_TAG);
+  await addCustomTag(name);
+  buildTagpick([...currentlySelected, name], containerId);
+  buildTagbar();
+}
+document.getElementById('newtag_add').onclick = ()=>handleNewTagAdd('tagpick');
+document.getElementById('newtag_input').onkeydown = (e)=>{ if(e.key==='Enter'){ e.preventDefault(); handleNewTagAdd('tagpick'); } };
+document.getElementById('c_newtag_add').onclick = ()=>handleNewTagAdd('c_tagpick');
+document.getElementById('c_newtag_input').onkeydown = (e)=>{ if(e.key==='Enter'){ e.preventDefault(); handleNewTagAdd('c_tagpick'); } };
+
 function getPickedTags(containerId){
   containerId = containerId || 'tagpick';
   return [...document.querySelectorAll('#'+containerId+' .tagchip.active')].map(c=>c.dataset.tag);
@@ -526,8 +605,7 @@ function getPickedTags(containerId){
   document.getElementById(id).oninput=(e)=>{document.getElementById(outIds[i]).textContent=e.target.value;};
 });
 
-document.getElementById('f_photoInput').onchange = (e)=>{
-  const file = e.target.files[0];
+function handlePhotoInput(file, onDone){
   if(!file) return;
   const img = new Image();
   const reader = new FileReader();
@@ -539,13 +617,25 @@ document.getElementById('f_photoInput').onchange = (e)=>{
       const canvas = document.createElement('canvas');
       canvas.width=w;canvas.height=h;
       canvas.getContext('2d').drawImage(img,0,0,w,h);
-      pendingPhoto = canvas.toDataURL('image/jpeg',0.72);
-      const prev = document.getElementById('f_photoPreview');
-      prev.src = pendingPhoto; prev.style.display='block';
+      onDone(canvas.toDataURL('image/jpeg',0.72));
     };
     img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
+}
+document.getElementById('f_photoInput').onchange = (e)=>{
+  handlePhotoInput(e.target.files[0], (dataUrl)=>{
+    pendingPhoto = dataUrl;
+    const prev = document.getElementById('f_photoPreview');
+    prev.src = pendingPhoto; prev.style.display='block';
+  });
+};
+document.getElementById('c_photoInput').onchange = (e)=>{
+  handlePhotoInput(e.target.files[0], (dataUrl)=>{
+    pendingConsiderPhoto = dataUrl;
+    const prev = document.getElementById('c_photoPreview');
+    prev.src = pendingConsiderPhoto; prev.style.display='block';
+  });
 };
 
 function openModal(id){
@@ -557,14 +647,15 @@ function openModal(id){
   document.getElementById('f_name').value = e?.name || '';
   document.getElementById('f_format').value = e?.format || 'EDP';
   document.getElementById('f_price').value = e?.price || '';
-  document.getElementById('f_overall').value = e?.overall || 4;
-  document.getElementById('f_longevity').value = e?.longevity || 3;
-  document.getElementById('lv_val').textContent = e?.longevity || 3;
-  document.getElementById('f_projection').value = e?.projection || 3;
-  document.getElementById('pj_val').textContent = e?.projection || 3;
-  document.getElementById('f_quality').value = e?.quality || 3;
-  document.getElementById('sq_val').textContent = e?.quality || 3;
-  document.getElementById('f_sting').checked = e?.sting || false;
+  document.getElementById('f_overall').value = e?.overall || 1;
+  document.getElementById('f_longevity').value = e?.longevity || 1;
+  document.getElementById('lv_val').textContent = e?.longevity || 1;
+  document.getElementById('f_projection').value = e?.projection || 1;
+  document.getElementById('pj_val').textContent = e?.projection || 1;
+  document.getElementById('f_quality').value = e?.quality || 1;
+  document.getElementById('sq_val').textContent = e?.quality || 1;
+  document.getElementById('f_stingYes').checked = !!(e?.sting);
+  document.getElementById('f_stingNo').checked = e ? !e.sting : true;
   document.getElementById('f_notes').value = e?.notes || '';
   const prev = document.getElementById('f_photoPreview');
   if(e?.photo){ prev.src = e.photo; prev.style.display='block'; pendingPhoto = e.photo; }
@@ -589,7 +680,7 @@ document.getElementById('saveEntry').onclick = async ()=>{
     longevity: parseInt(document.getElementById('f_longevity').value),
     projection: parseInt(document.getElementById('f_projection').value),
     quality: parseInt(document.getElementById('f_quality').value),
-    sting: document.getElementById('f_sting').checked,
+    sting: document.getElementById('f_stingYes').checked,
     notes: document.getElementById('f_notes').value.trim(),
   };
   if(editingId){
@@ -725,6 +816,7 @@ function renderConsiderations(){
         <span class="accession">No. C${String(e.no).padStart(3,'0')}</span>
         <span class="chip ${verdictClass(e.verdict)}">${e.verdict||'Considering'}</span>
       </div>
+      <div class="photo">${e.photo?`<img src="${e.photo}">`:svgBottle()}</div>
       <div class="card-body">
         <div>
           <div class="brand">${e.brand}</div>
@@ -735,6 +827,7 @@ function renderConsiderations(){
         ${linkRow(e)}
       </div>
       <div class="card-actions">
+        <a class="lookup" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(e.brand+' '+e.name+' perfume price')}">Look up online ↗</a>
         <button class="edit" data-id="${e.id}">Edit</button>
         <button class="del" data-id="${e.id}">Remove</button>
       </div>
@@ -745,6 +838,7 @@ function renderConsiderations(){
 }
 
 function openConsiderModal(id){
+  pendingConsiderPhoto = null;
   const e = id ? considerations.entries.find(x=>x.id===id) : null;
   document.getElementById('c_editId').value = id || '';
   document.getElementById('considerModalTitle').textContent = e ? 'Edit consideration' : 'Add to Under Consideration';
@@ -755,6 +849,9 @@ function openConsiderModal(id){
   document.getElementById('c_link1').value = e?.link1 || '';
   document.getElementById('c_link2').value = e?.link2 || '';
   document.getElementById('c_link3').value = e?.link3 || '';
+  const cprev = document.getElementById('c_photoPreview');
+  if(e?.photo){ cprev.src = e.photo; cprev.style.display='block'; pendingConsiderPhoto = e.photo; }
+  else { cprev.style.display='none'; cprev.src=''; }
   buildTagpick(e?.tags || [], 'c_tagpick');
   document.getElementById('considerOverlay').classList.remove('hidden');
 }
@@ -768,6 +865,7 @@ document.getElementById('saveConsiderEntry').onclick = async ()=>{
   const editId = document.getElementById('c_editId').value;
   const data = {
     brand, name,
+    photo: pendingConsiderPhoto,
     tags: getPickedTags('c_tagpick'),
     verdict: document.getElementById('c_verdict').value,
     notes: document.getElementById('c_notes').value.trim(),
