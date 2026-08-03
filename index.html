@@ -86,18 +86,16 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .card:hover{border-color:var(--gold);}
 .card-top{display:flex;justify-content:space-between;align-items:flex-start;padding:12px 14px 0;}
 .accession{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-muted);letter-spacing:.05em;}
-.seal{width:38px;height:38px;border-radius:50%;border:1px solid var(--gold);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;line-height:1;}
-.seal .n{font-size:12px;font-weight:600;color:var(--amber);}
-.seal .of5{font-size:7px;color:var(--text-muted);}
 .photo{margin:10px 14px 0;aspect-ratio:1/1;background:var(--surface-2);border:1px solid var(--line);border-radius:2px;display:flex;align-items:center;justify-content:center;overflow:hidden;}
 .photo img{width:100%;height:100%;object-fit:cover;}
 .photo svg{width:38%;opacity:.35;}
 .card-body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:8px;flex:1;}
 .brand{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);}
 .name{font-family:'Fraunces',serif;font-weight:600;font-size:19px;line-height:1.15;}
-.star-row{position:relative;height:15px;font-size:14px;letter-spacing:2px;line-height:1;font-family:'IBM Plex Mono',monospace;margin-top:-2px;}
-.star-row .bg{color:var(--line);}
-.star-row .fg{position:absolute;top:0;left:0;overflow:hidden;color:var(--amber);white-space:nowrap;}
+.star-row{display:flex;gap:1px;margin-top:-2px;}
+.star-cell{position:relative;display:inline-block;width:14px;height:15px;font-size:14px;line-height:1;font-family:'IBM Plex Mono',monospace;}
+.star-bg{position:absolute;top:0;left:0;color:var(--line);}
+.star-fg{position:absolute;top:0;left:0;overflow:hidden;color:var(--amber);white-space:nowrap;}
 .chips{display:flex;flex-wrap:wrap;gap:5px;}
 .chip{font-size:10px;font-family:'IBM Plex Mono',monospace;padding:3px 8px;border-radius:20px;color:#EFE7DA;opacity:.9;background:var(--other);}
 .chip.Oud{background:var(--oud);} .chip.Gourmand{background:var(--gourmand);} .chip.Amber{background:var(--amber-tag);color:#17120F;}
@@ -481,12 +479,16 @@ function buildTagbar(){
   });
 }
 
-function starSeal(v){
-  return `<div class="seal"><span class="n">★${v}</span><span class="of5">/ 5</span></div>`;
-}
 function starRow(v){
-  const pct = Math.max(0,Math.min(100,(v/5)*100));
-  return `<div class="star-row"><div class="bg">★★★★★</div><div class="fg" style="width:${pct}%">★★★★★</div></div>`;
+  v = Number(v) || 0;
+  let out = '<div class="star-row">';
+  for(let i=1;i<=5;i++){
+    const remaining = v - (i-1);
+    const pct = remaining >= 1 ? 100 : (remaining >= 0.5 ? 50 : 0);
+    out += `<span class="star-cell"><span class="star-bg">★</span><span class="star-fg" style="width:${pct}%">★</span></span>`;
+  }
+  out += '</div>';
+  return out;
 }
 function dots(v){
   let h='';
@@ -517,7 +519,6 @@ function render(){
     <div class="card">
       <div class="card-top">
         <span class="accession">No. ${String(e.no).padStart(3,'0')}</span>
-        ${starSeal(e.overall)}
       </div>
       <div class="photo">${e.photo?`<img src="${e.photo}">`:svgBottle()}</div>
       <div class="card-body">
