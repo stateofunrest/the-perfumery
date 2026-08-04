@@ -140,6 +140,10 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .slider-row span{font-family:'IBM Plex Mono',monospace;font-size:12px;width:20px;text-align:center;color:var(--amber);}
 .tagpick{display:flex;flex-wrap:wrap;gap:7px;}
 .tagpick .tagchip{border-color:var(--line);}
+.tags-more-trigger{background:var(--surface-2);color:var(--gold);}
+.tags-more-popover{position:absolute;top:calc(100% + 6px);left:0;z-index:20;background:var(--surface);border:1px solid var(--gold);border-radius:4px;padding:10px;display:flex;flex-wrap:wrap;gap:6px;max-width:280px;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+.tags-more-popover.hidden{display:none;}
+.tag-anchor{position:relative;display:inline-block;}
 .newtag-row{display:none;gap:8px;margin-top:8px;}
 .newtag-row.show{display:flex;}
 .newtag-row input{flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--text);padding:6px 9px;border-radius:2px;font-size:12.5px;}
@@ -359,7 +363,10 @@ const FirestoreStore = {
 const BASE_TAGS = ["Oud","Gourmand","Amber","Rose","Fresh","Sandalwood","Vetiver"];
 const OTHER_TAG = "Other";
 let customTags = [];
-function getAllTags(){ return [...BASE_TAGS, ...customTags, OTHER_TAG]; }
+function getAllTags(){
+  const real = [...BASE_TAGS, ...customTags].sort((a,b)=>a.localeCompare(b));
+  return [...real, OTHER_TAG];
+}
 async function loadCustomTags(){
   try{
     const snap = await FirestoreStore.get('custom-tags', false);
@@ -369,12 +376,42 @@ async function loadCustomTags(){
 async function addCustomTag(name){
   name = (name||'').trim();
   if(!name) return null;
+  name = name.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
   // avoid duplicates against base tags, other, or existing custom tags (case-insensitive)
   const exists = getAllTags().some(t=>t.toLowerCase()===name.toLowerCase());
   if(exists) return name;
   customTags.push(name);
   try{ await FirestoreStore.set('custom-tags', JSON.stringify(customTags), false); }catch(e){ console.error('could not save new tag', e); }
   return name;
+}
+
+// Maps common fragrance-note words to the hue of the real ingredient (lemon->yellow, vanilla->brown, etc.)
+const NOTE_HUES = {
+  lemon:50, citrus:48, lime:75, grapefruit:60, mandarin:34, orange:28, tangerine:30, bergamot:56,
+  rose:340, peony:335, plum:290, blackcurrant:280, violet:268, iris:262, lavender:255, grape:285, wisteria:260,
+  vanilla:28, tonka:30, caramel:24, coffee:20, cacao:18, chocolate:20, tobacco:22, leather:20, patchouli:24,
+  cedar:30, sandalwood:32, oud:22, amberwood:30, musk:40, powder:45, ambergris:38,
+  coconut:42, jasmine:50, tuberose:48, lily:46, magnolia:44, gardenia:46, orchid:320, ylang:50,
+  cinnamon:18, clove:15, nutmeg:24, cardamom:70, saffron:20, pepper:16, ginger:28, anise:110,
+  mint:150, eucalyptus:160, basil:110, grass:100, moss:85, oakmoss:80, fig:95, ivy:120, herbal:115, thyme:105,
+  marine:200, aquatic:195, ozonic:190, sea:205, rain:200,
+  honey:44, apple:100, pear:75, pineapple:52, watermelon:340, peach:22, apricot:30, mango:40, litchi:340, lychee:340,
+  smoke:15, incense:20, geranium:130, pinkpepper:340, blackpepper:16
+};
+function hashHue(str){
+  let h=0; for(let i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))>>>0; }
+  return h%360;
+}
+function colorForTag(name){
+  const key = name.trim().toLowerCase().replace(/[^a-z]/g,'');
+  if(Object.prototype.hasOwnProperty.call(NOTE_HUES,key)) return `hsl(${NOTE_HUES[key]},42%,38%)`;
+  for(const k in NOTE_HUES){ if(key.includes(k) || k.includes(key)){ return `hsl(${NOTE_HUES[k]},42%,38%)`; } }
+  return `hsl(${hashHue(key)},32%,36%)`;
+}
+function isBaseTag(t){ return BASE_TAGS.includes(t) || t===OTHER_TAG; }
+function chipHtml(t){
+  if(isBaseTag(t)) return `<span class="chip ${t}">${t}</span>`;
+  return `<span class="chip" style="background:${colorForTag(t)}">${t}</span>`;
 }
 let vault = { entries: [], nextNo: 1 };
 let profile = {};
@@ -467,6 +504,60 @@ document.getElementById('saveProfile').onclick = async ()=>{
   btn.textContent = 'Saved ✓'; setTimeout(()=>btn.textContent='Save profile',1200);
 };
 
+function collapseTagRow(containerId, maxLines){
+  const container = document.getElementById(containerId);
+  if(!container || container.offsetParent === null) return; // hidden right now — will be re-run when it becomes visible
+  // undo any previous collapse pass first (put popover chips back, remove trigger) so we measure fresh
+  const prevAnchor = container.querySelector('.tag-anchor');
+  if(prevAnchor){
+    const popover = prevAnchor.querySelector('.tags-more-popover');
+    if(popover){ while(popover.firstChild) container.insertBefore(popover.firstChild, prevAnchor); }
+    prevAnchor.remove();
+  }
+  const chips = Array.from(container.children);
+  if(chips.length === 0) return;
+  const rows = [];
+  chips.forEach(chip=>{
+    const top = chip.offsetTop;
+    let row = rows.find(r=>Math.abs(r.top-top)<2);
+    if(!row){ row = {top, chips:[]}; rows.push(row); }
+    row.chips.push(chip);
+  });
+  if(rows.length <= maxLines) return;
+  const hiddenChips = rows.slice(maxLines).flatMap(r=>r.chips);
+  hiddenChips.forEach(c=>c.remove());
+
+  const anchor = document.createElement('span');
+  anchor.className = 'tag-anchor';
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'tagchip tags-more-trigger';
+  trigger.textContent = `⋯ ${hiddenChips.length} more`;
+  const popover = document.createElement('div');
+  popover.className = 'tags-more-popover hidden';
+  hiddenChips.forEach(c=>popover.appendChild(c));
+  anchor.appendChild(trigger);
+  anchor.appendChild(popover);
+  container.appendChild(anchor);
+
+  trigger.onclick = (ev)=>{
+    ev.stopPropagation();
+    popover.classList.toggle('hidden');
+  };
+}
+let _tagPopoverListenerBound = false;
+function ensureTagPopoverOutsideClick(){
+  if(_tagPopoverListenerBound) return;
+  _tagPopoverListenerBound = true;
+  document.addEventListener('click', (ev)=>{
+    document.querySelectorAll('.tags-more-popover').forEach(pop=>{
+      if(pop.classList.contains('hidden')) return;
+      const anchor = pop.closest('.tag-anchor');
+      if(anchor && !anchor.contains(ev.target)) pop.classList.add('hidden');
+    });
+  });
+}
+ensureTagPopoverOutsideClick();
 function buildTagbar(){
   const bar = document.getElementById('tagbar');
   bar.innerHTML = getAllTags().map(t=>`<button class="tagchip" data-tag="${t}">${t}</button>`).join('');
@@ -478,6 +569,7 @@ function buildTagbar(){
       render();
     };
   });
+  collapseTagRow('tagbar', 2);
 }
 
 const STAR_PATH = "M12 1.5 15.09 8.26 22.5 9.27 17.25 14.14 18.68 21.75 12 18.02 5.32 21.75 6.75 14.14 1.5 9.27 8.91 8.26 Z";
@@ -532,7 +624,7 @@ function render(){
           <div class="name">${e.name}</div>
           ${starRow(e.overall)}
         </div>
-        <div class="chips">${e.tags.map(t=>`<span class="chip ${t}">${t}</span>`).join('')}</div>
+        <div class="chips">${e.tags.map(t=>chipHtml(t)).join('')}</div>
         <div class="stats">
           <div class="stat"><span class="lbl">Longevity</span><div class="dots">${dots(e.longevity)}</div></div>
           <div class="stat"><span class="lbl">Projection</span><div class="dots">${dots(e.projection)}</div></div>
@@ -566,6 +658,18 @@ async function restoreSortPref(){
   }catch(e){ /* default sort stands */ }
 }
 
+function applyChipActiveColor(chip){
+  const t = chip.dataset.tag;
+  if(chip.classList.contains('active') && !isBaseTag(t)){
+    chip.style.background = colorForTag(t);
+    chip.style.borderColor = colorForTag(t);
+    chip.style.color = '#EFE7DA';
+  } else {
+    chip.style.background = '';
+    chip.style.borderColor = '';
+    chip.style.color = '';
+  }
+}
 function buildTagpick(selected, containerId){
   containerId = containerId || 'tagpick';
   const rowId = containerId==='tagpick' ? 'newtag_row' : 'c_newtag_row';
@@ -577,8 +681,10 @@ function buildTagpick(selected, containerId){
   document.getElementById(inputId).value = '';
   el.querySelectorAll('.tagchip').forEach(chip=>{
     if(selected.includes(chip.dataset.tag)) chip.classList.add('active');
+    applyChipActiveColor(chip);
     chip.onclick = ()=>{
       chip.classList.toggle('active');
+      applyChipActiveColor(chip);
       if(chip.dataset.tag === OTHER_TAG){
         row.classList.toggle('show');
         if(row.classList.contains('show')) document.getElementById(inputId).focus();
@@ -594,6 +700,7 @@ async function handleNewTagAdd(containerId){
   const currentlySelected = getPickedTags(containerId).filter(t=>t!==OTHER_TAG);
   await addCustomTag(name);
   buildTagpick([...currentlySelected, name], containerId);
+  requestAnimationFrame(()=>collapseTagRow(containerId, 2));
   buildTagbar();
 }
 document.getElementById('newtag_add').onclick = ()=>handleNewTagAdd('tagpick');
@@ -668,6 +775,7 @@ function openModal(id){
   else { prev.style.display='none'; prev.src=''; }
   buildTagpick(e?.tags || []);
   document.getElementById('overlay').classList.remove('hidden');
+  requestAnimationFrame(()=>collapseTagRow('tagpick', 2));
 }
 document.getElementById('addBtn').onclick = ()=>openModal(null);
 document.getElementById('cancelModal').onclick = ()=>document.getElementById('overlay').classList.add('hidden');
@@ -828,7 +936,7 @@ function renderConsiderations(){
           <div class="brand">${e.brand}</div>
           <div class="name">${e.name}</div>
         </div>
-        <div class="chips">${(e.tags||[]).map(t=>`<span class="chip ${t}">${t}</span>`).join('')}</div>
+        <div class="chips">${(e.tags||[]).map(t=>chipHtml(t)).join('')}</div>
         ${e.notes?`<div class="notes">${e.notes}</div>`:''}
         ${linkRow(e)}
       </div>
@@ -860,6 +968,7 @@ function openConsiderModal(id){
   else { cprev.style.display='none'; cprev.src=''; }
   buildTagpick(e?.tags || [], 'c_tagpick');
   document.getElementById('considerOverlay').classList.remove('hidden');
+  requestAnimationFrame(()=>collapseTagRow('c_tagpick', 2));
 }
 document.getElementById('addConsiderBtn').onclick = ()=>openConsiderModal(null);
 document.getElementById('cancelConsiderModal').onclick = ()=>document.getElementById('considerOverlay').classList.add('hidden');
@@ -927,6 +1036,7 @@ function switchTab(tab){
   document.getElementById('tabBtnCollection').classList.toggle('active', tab==='collection');
   document.getElementById('tabBtnConsider').classList.toggle('active', tab==='consider');
   try{ FirestoreStore.set('ui-active-tab', tab, false); }catch(e){}
+  if(tab==='collection') requestAnimationFrame(()=>collapseTagRow('tagbar', 2));
 }
 document.getElementById('tabBtnCollection').onclick = ()=>switchTab('collection');
 document.getElementById('tabBtnConsider').onclick = ()=>switchTab('consider');
