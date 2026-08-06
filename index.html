@@ -68,7 +68,7 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .btn.ghost{border-color:var(--line);color:var(--text-muted);}
 .btn.ghost:hover{background:var(--surface-2);color:var(--text);}
 
-.tagbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:26px;}
+.tagbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:26px;position:relative;}
 .tagchip{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);color:var(--text-muted);cursor:pointer;background:transparent;transition:.15s;}
 .tagchip.active{color:#17120F;border-color:transparent;background:var(--amber);}
 .tagchip[data-tag="Oud"].active{background:var(--oud);color:#EFE7DA;}
@@ -138,12 +138,12 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .slider-row{display:flex;align-items:center;gap:10px;}
 .slider-row input[type=range]{flex:1;accent-color:var(--amber);}
 .slider-row span{font-family:'IBM Plex Mono',monospace;font-size:12px;width:20px;text-align:center;color:var(--amber);}
-.tagpick{display:flex;flex-wrap:wrap;gap:7px;}
+.tagpick{display:flex;flex-wrap:wrap;gap:7px;position:relative;}
 .tagpick .tagchip{border-color:var(--line);}
 .tags-more-trigger{background:var(--surface-2);color:var(--gold);}
-.tags-more-popover{position:absolute;top:calc(100% + 6px);left:0;z-index:20;background:var(--surface);border:1px solid var(--gold);border-radius:4px;padding:10px;display:flex;flex-wrap:wrap;gap:6px;max-width:280px;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+.tags-more-popover{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:20;background:var(--surface);border:1px solid var(--gold);border-radius:4px;padding:10px;display:flex;flex-wrap:wrap;gap:6px;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4);}
 .tags-more-popover.hidden{display:none;}
-.tag-anchor{position:relative;display:inline-block;}
+.tag-anchor{display:inline-block;}
 .newtag-row{display:none;gap:8px;margin-top:8px;}
 .newtag-row.show{display:flex;}
 .newtag-row input{flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--text);padding:6px 9px;border-radius:2px;font-size:12.5px;}
@@ -249,6 +249,7 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
       </select>
     </div>
     <div class="field"><label>Notes — why it's on the list, what it might get wrong</label><textarea id="c_notes" placeholder="Fits the fresh/gym slot, but it's a crowded dupe category and longevity reviews are mixed…"></textarea></div>
+    <div class="field"><label>Lowest price found</label><input id="c_lowestPrice" placeholder="₹3,200"></div>
     <div class="field"><label>Shopping link 1</label><input id="c_link1" placeholder="Paste a shopping link…"></div>
     <div class="field"><label>Shopping link 2</label><input id="c_link2" placeholder="Paste a shopping link…"></div>
     <div class="field"><label>Shopping link 3</label><input id="c_link3" placeholder="Paste a shopping link…"></div>
@@ -687,7 +688,10 @@ function buildTagpick(selected, containerId){
       applyChipActiveColor(chip);
       if(chip.dataset.tag === OTHER_TAG){
         row.classList.toggle('show');
-        if(row.classList.contains('show')) document.getElementById(inputId).focus();
+        if(row.classList.contains('show')){
+          document.getElementById(inputId).focus();
+          el.querySelectorAll('.tags-more-popover').forEach(p=>p.classList.add('hidden'));
+        }
       }
     };
   });
@@ -937,6 +941,7 @@ function renderConsiderations(){
           <div class="name">${e.name}</div>
         </div>
         <div class="chips">${(e.tags||[]).map(t=>chipHtml(t)).join('')}</div>
+        ${e.lowestPrice?`<div class="meta-row"><span>Lowest price found</span><span>${e.lowestPrice}</span></div>`:''}
         ${e.notes?`<div class="notes">${e.notes}</div>`:''}
         ${linkRow(e)}
       </div>
@@ -960,6 +965,7 @@ function openConsiderModal(id){
   document.getElementById('c_name').value = e?.name || '';
   document.getElementById('c_verdict').value = e?.verdict || 'Considering';
   document.getElementById('c_notes').value = e?.notes || '';
+  document.getElementById('c_lowestPrice').value = e?.lowestPrice || '';
   document.getElementById('c_link1').value = e?.link1 || '';
   document.getElementById('c_link2').value = e?.link2 || '';
   document.getElementById('c_link3').value = e?.link3 || '';
@@ -984,6 +990,7 @@ document.getElementById('saveConsiderEntry').onclick = async ()=>{
     tags: getPickedTags('c_tagpick'),
     verdict: document.getElementById('c_verdict').value,
     notes: document.getElementById('c_notes').value.trim(),
+    lowestPrice: document.getElementById('c_lowestPrice').value.trim(),
     link1: document.getElementById('c_link1').value.trim(),
     link2: document.getElementById('c_link2').value.trim(),
     link3: document.getElementById('c_link3').value.trim(),
