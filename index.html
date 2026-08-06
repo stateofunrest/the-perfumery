@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <title>The Perfumery</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root{
   --bg:#17120F;
@@ -13,8 +13,11 @@
   --line:#40342A;
   --text:#EFE7DA;
   --text-muted:#A5978A;
-  --amber:#C97C3D;
-  --gold:#B08D57;
+  --amber:#04E15B;
+  --gold:#A3A3A3;
+  --accent-1:#04E15B;
+  --accent-2:#A3A3A3;
+  --accent-gradient:linear-gradient(135deg,var(--accent-1),var(--accent-2));
   --danger:#A85C4A;
   --oud:#6E4A2E;
   --gourmand:#A8632D;
@@ -25,15 +28,44 @@
   --vetiver:#516B4E;
   --other:#5A5048;
 }
+html[data-theme="light"]{
+  --bg:#F5F1E8;
+  --surface:#FFFFFF;
+  --surface-2:#ECE4D4;
+  --line:#D9CDB8;
+  --text:#241E17;
+  --text-muted:#726555;
+  --amber:#04B34C;
+  --gold:#5B5B5B;
+}
+@media (prefers-color-scheme: light){
+  html[data-theme="system"]{
+    --bg:#F5F1E8;
+    --surface:#FFFFFF;
+    --surface-2:#ECE4D4;
+    --line:#D9CDB8;
+    --text:#241E17;
+    --text-muted:#726555;
+    --amber:#04B34C;
+    --gold:#5B5B5B;
+  }
+}
 *{box-sizing:border-box;}
-html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sans-serif;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sans-serif;transition:background .2s,color .2s;}
 body{padding:40px 32px 80px;min-height:100vh;}
 .wrap{max-width:1180px;margin:0 auto;}
 
 /* header */
-header.top{margin-bottom:28px;}
+header.top{margin-bottom:28px;position:relative;}
+.theme-switch{position:absolute;top:0;right:0;display:flex;gap:2px;background:var(--surface-2);border:1px solid var(--line);border-radius:20px;padding:3px;}
+.theme-switch button{background:transparent;border:none;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:5px 11px;border-radius:16px;cursor:pointer;transition:.15s;}
+.theme-switch button:hover{color:var(--text);}
+.theme-switch button.active{background:var(--accent-gradient);color:#17120F;}
+@media (max-width:480px){
+  .theme-switch{position:static;display:inline-flex;margin-bottom:14px;}
+}
 .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;color:var(--gold);text-transform:uppercase;}
-h1.title{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(36px,6vw,54px);margin:6px 0 4px;letter-spacing:-0.01em;}
+h1.title{font-family:'Abril Fatface',serif;font-weight:400;font-size:clamp(36px,6vw,54px);margin:6px 0 4px;letter-spacing:-0.01em;background:linear-gradient(135deg,var(--amber),var(--gold));background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent;}
 .subtitle{color:var(--text-muted);font-size:14.5px;max-width:520px;line-height:1.5;}
 .goldrule{height:1px;background:linear-gradient(90deg,var(--gold),transparent 70%);margin:20px 0 0;}
 
@@ -41,7 +73,8 @@ h1.title{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(36px,6vw,5
 .tabnav{display:flex;border-bottom:1px solid var(--line);margin-bottom:26px;}
 .tabbtn{background:transparent;border:none;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:12.5px;letter-spacing:.04em;padding:11px 4px;margin-right:26px;cursor:pointer;position:relative;top:1px;border-bottom:2px solid transparent;transition:.15s;}
 .tabbtn:hover{color:var(--text);}
-.tabbtn.active{color:var(--amber);border-bottom-color:var(--amber);}
+.tabbtn.active{color:var(--amber);border-bottom-color:transparent;}
+.tabbtn.active::after{content:'';position:absolute;left:0;right:0;bottom:-2px;height:2px;background:var(--accent-gradient);}
 .tab-panel.hidden{display:none;}
 
 /* profile card */
@@ -62,15 +95,15 @@ h1.title{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(36px,6vw,5
 .search:focus{outline:1px solid var(--amber);}
 select.sort{background:var(--surface);border:1px solid var(--line);color:var(--text);padding:9px 10px;border-radius:2px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;}
 .btn{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.03em;padding:9px 16px;border-radius:2px;border:1px solid var(--amber);background:transparent;color:var(--amber);cursor:pointer;transition:.15s;white-space:nowrap;}
-.btn:hover{background:var(--amber);color:#17120F;}
-.btn.primary{background:var(--amber);color:#17120F;}
+.btn:hover{background:var(--accent-gradient);color:#17120F;border-color:transparent;}
+.btn.primary{background:var(--accent-gradient);color:#17120F;border-color:transparent;}
 .btn.primary:hover{background:#dd8f4e;}
 .btn.ghost{border-color:var(--line);color:var(--text-muted);}
 .btn.ghost:hover{background:var(--surface-2);color:var(--text);}
 
 .tagbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:26px;position:relative;}
 .tagchip{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);color:var(--text-muted);cursor:pointer;background:transparent;transition:.15s;}
-.tagchip.active{color:#17120F;border-color:transparent;background:var(--amber);}
+.tagchip.active{color:#17120F;border-color:transparent;background:var(--accent-gradient);}
 .tagchip[data-tag="Oud"].active{background:var(--oud);color:#EFE7DA;}
 .tagchip[data-tag="Gourmand"].active{background:var(--gourmand);}
 .tagchip[data-tag="Amber"].active{background:var(--amber-tag);}
@@ -96,7 +129,7 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .star-cell{position:relative;display:inline-block;width:12.75px;height:12.75px;}
 .star-svg{position:absolute;top:0;left:0;width:12.75px;height:12.75px;}
 .star-bg path{fill:var(--line);}
-.star-fg path{fill:var(--amber);}
+.star-fg path{fill:url(#starGrad);}
 .chips{display:flex;flex-wrap:wrap;gap:5px;}
 .chip{font-size:10px;font-family:'IBM Plex Mono',monospace;padding:3px 8px;border-radius:20px;color:#EFE7DA;opacity:.9;background:var(--other);}
 .chip.Oud{background:var(--oud);} .chip.Gourmand{background:var(--gourmand);} .chip.Amber{background:var(--amber-tag);color:#17120F;}
@@ -147,7 +180,7 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .newtag-row{display:none;gap:8px;margin-top:8px;}
 .newtag-row.show{display:flex;}
 .newtag-row input{flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--text);padding:6px 9px;border-radius:2px;font-size:12.5px;}
-.newtag-row button{background:var(--amber);border:none;color:#17120F;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:6px 12px;border-radius:2px;cursor:pointer;white-space:nowrap;}
+.newtag-row button{background:var(--accent-gradient);border:none;color:#17120F;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:6px 12px;border-radius:2px;cursor:pointer;white-space:nowrap;}
 .checkline{display:flex;align-items:center;gap:8px;margin-top:2px;}
 .checkline input{width:auto;}
 .checkline label{font-size:13px;color:var(--text-muted);font-family:'Work Sans';text-transform:none;letter-spacing:0;}
@@ -159,8 +192,21 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#04E15B"/>
+      <stop offset="100%" stop-color="#A3A3A3"/>
+    </linearGradient>
+  </defs>
+</svg>
 <div class="wrap">
   <header class="top">
+    <div class="theme-switch" id="themeSwitch">
+      <button type="button" data-theme-choice="light">Light</button>
+      <button type="button" data-theme-choice="dark">Dark</button>
+      <button type="button" data-theme-choice="system">System</button>
+    </div>
     <div class="eyebrow">A working record of scent</div>
     <h1 class="title">The Perfumery</h1>
     <p class="subtitle">Everything you own, rated on your terms &mdash; longevity, projection, and how it actually sits on your skin.</p>
@@ -659,6 +705,28 @@ async function restoreSortPref(){
   }catch(e){ /* default sort stands */ }
 }
 
+function applyTheme(choice){
+  document.documentElement.setAttribute('data-theme', choice);
+  document.querySelectorAll('#themeSwitch button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.themeChoice === choice);
+  });
+}
+document.querySelectorAll('#themeSwitch button').forEach(btn=>{
+  btn.onclick = ()=>{
+    const choice = btn.dataset.themeChoice;
+    applyTheme(choice);
+    try{ FirestoreStore.set('ui-theme', choice, false); }catch(e){}
+  };
+});
+async function restoreThemePref(){
+  let choice = 'dark';
+  try{
+    const t = await FirestoreStore.get('ui-theme', false);
+    if(t && t.value) choice = t.value;
+  }catch(e){ /* default to dark */ }
+  applyTheme(choice);
+}
+
 function applyChipActiveColor(chip){
   const t = chip.dataset.tag;
   if(chip.classList.contains('active') && !isBaseTag(t)){
@@ -1049,6 +1117,7 @@ document.getElementById('tabBtnCollection').onclick = ()=>switchTab('collection'
 document.getElementById('tabBtnConsider').onclick = ()=>switchTab('consider');
 
 (async ()=>{
+  await restoreThemePref();
   const migrated = await migrateOldData();
   if(!migrated) await seedIfEmpty();
   await loadAll();
