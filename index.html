@@ -746,12 +746,14 @@ function applyChipActiveColor(chip){
     chip.style.color = '';
   }
 }
+const tagOrder = { tagpick: [], c_tagpick: [] };
 function buildTagpick(selected, containerId){
   containerId = containerId || 'tagpick';
   const rowId = containerId==='tagpick' ? 'newtag_row' : 'c_newtag_row';
   const inputId = containerId==='tagpick' ? 'newtag_input' : 'c_newtag_input';
   const el = document.getElementById(containerId);
   const row = document.getElementById(rowId);
+  tagOrder[containerId] = [...selected];
   el.innerHTML = getAllTags().map(t=>`<button type="button" class="tagchip" data-tag="${t}">${t}</button>`).join('');
   row.classList.remove('show');
   document.getElementById(inputId).value = '';
@@ -759,9 +761,15 @@ function buildTagpick(selected, containerId){
     if(selected.includes(chip.dataset.tag)) chip.classList.add('active');
     applyChipActiveColor(chip);
     chip.onclick = ()=>{
+      const t = chip.dataset.tag;
       chip.classList.toggle('active');
       applyChipActiveColor(chip);
-      if(chip.dataset.tag === OTHER_TAG){
+      if(chip.classList.contains('active')){
+        if(!tagOrder[containerId].includes(t)) tagOrder[containerId].push(t);
+      } else {
+        tagOrder[containerId] = tagOrder[containerId].filter(x=>x!==t);
+      }
+      if(t === OTHER_TAG){
         row.classList.toggle('show');
         if(row.classList.contains('show')){
           document.getElementById(inputId).focus();
@@ -789,7 +797,7 @@ document.getElementById('c_newtag_input').onkeydown = (e)=>{ if(e.key==='Enter')
 
 function getPickedTags(containerId){
   containerId = containerId || 'tagpick';
-  return [...document.querySelectorAll('#'+containerId+' .tagchip.active')].map(c=>c.dataset.tag);
+  return [...(tagOrder[containerId] || [])];
 }
 
 ['f_longevity','f_projection','f_quality'].forEach((id,i)=>{
