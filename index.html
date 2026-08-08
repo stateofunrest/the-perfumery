@@ -52,7 +52,7 @@ html[data-theme="light"]{
   }
 }
 *{box-sizing:border-box;}
-html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sans-serif;transition:background .2s,color .2s;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Work Sans',sans-serif;transition:background .2s,color .2s;overflow-x:hidden;}
 body{padding:40px 32px 80px;min-height:100vh;}
 .wrap{max-width:1180px;margin:0 auto;}
 
@@ -84,7 +84,8 @@ header.top{margin-bottom:28px;position:relative;}
 .profile-tab:hover{color:var(--amber);border-color:var(--amber);}
 .profile-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:49;}
 .profile-backdrop.hidden{display:none;}
-.profile-panel{position:fixed;top:0;right:0;height:100vh;width:360px;max-width:90vw;background:var(--surface);border-left:1px solid var(--line);box-shadow:-12px 0 32px rgba(0,0,0,.4);z-index:50;padding:24px;overflow-y:auto;transform:translateX(100%);transition:transform .25s ease;}
+.profile-panel{position:fixed;top:0;right:0;height:100vh;width:360px;max-width:90vw;background:var(--surface);border-left:1px solid var(--line);box-shadow:none;z-index:50;padding:24px;overflow-y:auto;transform:translateX(100%);transition:transform .25s ease;}
+.profile-panel.open{box-shadow:-12px 0 32px rgba(0,0,0,.4);}
 .profile-panel.open{transform:translateX(0);}
 .profile-panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
 .profile-panel-head h2{font-family:'Fraunces',serif;font-weight:500;font-size:18px;margin:0;}
@@ -502,33 +503,6 @@ function svgBottle(){
   return '<svg viewBox="0 0 24 24" fill="none" stroke="#A5978A" stroke-width="1.2"><path d="M9 2h6M10 2v3.2c0 .5-.2.9-.5 1.3L8 8.5c-.5.6-.8 1.4-.8 2.2V20a2 2 0 0 0 2 2h5.6a2 2 0 0 0 2-2v-9.3c0-.8-.3-1.6-.8-2.2l-1.5-2c-.3-.4-.5-.8-.5-1.3V2"/></svg>';
 }
 
-async function loadAll(){
-  vault = { entries: [], nextNo: 1 };
-  try{
-    const meta = await FirestoreStore.get('vault-meta', false);
-    if(meta && meta.value) vault.nextNo = JSON.parse(meta.value).nextNo || 1;
-  }catch(e){ /* no meta yet */ }
-  try{
-    const listRes = await FirestoreStore.listWithData('entry:', false);
-    const docs = (listRes && listRes.docs) || [];
-    for(const d of docs){
-      try{ if(d.value) vault.entries.push(JSON.parse(d.value)); }
-      catch(e){ /* skip a single unreadable entry, don't fail the whole load */ }
-    }
-  }catch(e){ /* no entries yet */ }
-  try{
-    const p = await FirestoreStore.get('profile-data', false);
-    if(p && p.value) profile = JSON.parse(p.value);
-  }catch(e){ profile = {}; }
-  await loadCustomTags();
-  await restoreSortPref();
-  fillProfileForm();
-  document.getElementById('loadingMsg').style.display='none';
-  document.getElementById('grid').style.display='grid';
-  buildTagbar();
-  render();
-}
-
 async function saveMeta(){
   try{ await FirestoreStore.set('vault-meta', JSON.stringify({nextNo: vault.nextNo}), false); }
   catch(e){ console.error('meta save failed', e); }
@@ -729,13 +703,6 @@ document.getElementById('sortSel').onchange = ()=>{
   render();
   try{ FirestoreStore.set('ui-sort', document.getElementById('sortSel').value, false); }catch(e){}
 };
-async function restoreSortPref(){
-  try{
-    const s = await FirestoreStore.get('ui-sort', false);
-    if(s && s.value) document.getElementById('sortSel').value = s.value;
-  }catch(e){ /* default sort stands */ }
-}
-
 function applyTheme(choice){
   document.documentElement.setAttribute('data-theme', choice);
   document.querySelectorAll('#themeSwitch button').forEach(b=>{
@@ -749,15 +716,6 @@ document.querySelectorAll('#themeSwitch button').forEach(btn=>{
     try{ FirestoreStore.set('ui-theme', choice, false); }catch(e){}
   };
 });
-async function restoreThemePref(){
-  let choice = 'dark';
-  try{
-    const t = await FirestoreStore.get('ui-theme', false);
-    if(t && t.value) choice = t.value;
-  }catch(e){ /* default to dark */ }
-  applyTheme(choice);
-}
-
 function applyChipActiveColor(chip){
   const t = chip.dataset.tag;
   if(chip.classList.contains('active') && !isBaseTag(t)){
@@ -929,26 +887,13 @@ async function removeEntry(id){
   render();
 }
 
-async function migrateOldData(){
-  try{
-    const old = await FirestoreStore.get('vault-data', false);
-    if(old && old.value){
-      const parsed = JSON.parse(old.value);
-      for(const entry of (parsed.entries||[])){ await saveEntryToStorage(entry); }
-      vault.nextNo = parsed.nextNo || vault.nextNo;
-      await saveMeta();
-      try{ await FirestoreStore.delete('vault-data', false); }catch(e){}
-      return true;
-    }
-  }catch(e){ /* nothing old to migrate */ }
-  return false;
-}
-
-async function seedIfEmpty(){
-  try{
-    const listRes = await FirestoreStore.list('entry:', false);
-    if(listRes && listRes.keys && listRes.keys.length>0) return;
-  }catch(e){ /* no entries yet, proceed to seed */ }
+async function seedIfEmpty(skipCheck){
+  if(!skipCheck){
+    try{
+      const listRes = await FirestoreStore.list('entry:', false);
+      if(listRes && listRes.keys && listRes.keys.length>0) return;
+    }catch(e){ /* no entries yet, proceed to seed */ }
+  }
   vault = {
     nextNo: 12,
     entries: [
@@ -993,23 +938,6 @@ async function deleteConsiderEntryFromStorage(id){
   try{ await FirestoreStore.delete('consider:'+id, false); }
   catch(e){ console.error('delete failed', e); }
 }
-async function loadConsiderations(){
-  considerations = { entries: [], nextNo: 1 };
-  try{
-    const meta = await FirestoreStore.get('consider-meta', false);
-    if(meta && meta.value) considerations.nextNo = JSON.parse(meta.value).nextNo || 1;
-  }catch(e){ /* no meta yet */ }
-  try{
-    const listRes = await FirestoreStore.listWithData('consider:', false);
-    const docs = (listRes && listRes.docs) || [];
-    for(const d of docs){
-      try{ if(d.value) considerations.entries.push(JSON.parse(d.value)); }
-      catch(e){ /* skip a single unreadable entry */ }
-    }
-  }catch(e){ /* no entries yet */ }
-  renderConsiderations();
-}
-
 function safeUrl(u){
   if(!u) return '#';
   return /^https?:\/\//i.test(u) ? u : 'https://'+u;
@@ -1128,11 +1056,13 @@ async function removeConsiderEntry(id){
   renderConsiderations();
 }
 
-async function seedConsiderIfEmpty(){
-  try{
-    const listRes = await FirestoreStore.list('consider:', false);
-    if(listRes && listRes.keys && listRes.keys.length>0) return;
-  }catch(e){ /* proceed to seed */ }
+async function seedConsiderIfEmpty(skipCheck){
+  if(!skipCheck){
+    try{
+      const listRes = await FirestoreStore.list('consider:', false);
+      if(listRes && listRes.keys && listRes.keys.length>0) return;
+    }catch(e){ /* proceed to seed */ }
+  }
   const seedList = [
     {id:'c1',no:1,brand:'Rayhaan',name:'Pacific Aura',tags:['Fresh'],verdict:'Considering',
       notes:`Fits the fresh / gym / summer slot. Fresh-citrus-mint opening, amber-fig-ambroxan base. Reviews are mixed on longevity (4-5 hrs to all-day depending on skin and batch), and it's widely noted as a dupe of LV Pacific Chill — near-identical to a few other clones. Competent, but not distinctive.`,
@@ -1161,18 +1091,70 @@ document.getElementById('tabBtnCollection').onclick = ()=>switchTab('collection'
 document.getElementById('tabBtnConsider').onclick = ()=>switchTab('consider');
 
 (async ()=>{
-  await restoreThemePref();
-  const migrated = await migrateOldData();
-  if(!migrated) await seedIfEmpty();
-  await loadAll();
-  await seedConsiderIfEmpty();
-  await loadConsiderations();
-  let startTab = 'consider';
-  try{
-    const t = await FirestoreStore.get('ui-active-tab', false);
-    if(t && t.value) startTab = t.value;
-  }catch(e){ /* first visit, default to consider */ }
-  switchTab(startTab);
+  const results = await Promise.allSettled([
+    FirestoreStore.get('ui-theme', false),
+    FirestoreStore.get('vault-data', false),
+    FirestoreStore.get('vault-meta', false),
+    FirestoreStore.listWithData('entry:', false),
+    FirestoreStore.get('profile-data', false),
+    FirestoreStore.get('custom-tags', false),
+    FirestoreStore.get('ui-sort', false),
+    FirestoreStore.get('consider-meta', false),
+    FirestoreStore.listWithData('consider:', false),
+    FirestoreStore.get('ui-active-tab', false),
+  ]);
+  const [themeRes, oldDataRes, vaultMetaRes, entriesRes, profileRes, tagsRes, sortRes, considerMetaRes, considerListRes, tabRes] = results;
+  const val = (r)=> (r.status==='fulfilled' && r.value && r.value.value) ? r.value.value : null;
+
+  applyTheme(val(themeRes) || 'dark');
+
+  vault = { entries: [], nextNo: 1 };
+  const metaVal = val(vaultMetaRes);
+  if(metaVal){ try{ vault.nextNo = JSON.parse(metaVal).nextNo || 1; }catch(e){} }
+  const entryDocs = (entriesRes.status==='fulfilled' && entriesRes.value && entriesRes.value.docs) || [];
+  for(const d of entryDocs){ try{ if(d.value) vault.entries.push(JSON.parse(d.value)); }catch(e){} }
+
+  let migrated = false;
+  const oldVal = val(oldDataRes);
+  if(oldVal){
+    try{
+      const parsed = JSON.parse(oldVal);
+      for(const entry of (parsed.entries||[])){ await saveEntryToStorage(entry); vault.entries.push(entry); }
+      vault.nextNo = parsed.nextNo || vault.nextNo;
+      await saveMeta();
+      try{ await FirestoreStore.delete('vault-data', false); }catch(e){}
+      migrated = true;
+    }catch(e){ /* nothing valid to migrate */ }
+  }
+
+  const profileVal = val(profileRes);
+  profile = profileVal ? JSON.parse(profileVal) : {};
+  const tagsVal = val(tagsRes);
+  try{ customTags = tagsVal ? JSON.parse(tagsVal) : []; }catch(e){ customTags = []; }
+  const sortVal = val(sortRes);
+  if(sortVal) document.getElementById('sortSel').value = sortVal;
+
+  if(!migrated && vault.entries.length === 0){
+    await seedIfEmpty(true);
+  }
+
+  fillProfileForm();
+  document.getElementById('loadingMsg').style.display='none';
+  document.getElementById('grid').style.display='grid';
+  buildTagbar();
+  render();
+
+  considerations = { entries: [], nextNo: 1 };
+  const cMetaVal = val(considerMetaRes);
+  if(cMetaVal){ try{ considerations.nextNo = JSON.parse(cMetaVal).nextNo || 1; }catch(e){} }
+  const considerDocs = (considerListRes.status==='fulfilled' && considerListRes.value && considerListRes.value.docs) || [];
+  for(const d of considerDocs){ try{ if(d.value) considerations.entries.push(JSON.parse(d.value)); }catch(e){} }
+  if(considerations.entries.length === 0){
+    await seedConsiderIfEmpty(true);
+  }
+  renderConsiderations();
+
+  switchTab(val(tabRes) || 'consider');
 })();
 </script>
 </body>
