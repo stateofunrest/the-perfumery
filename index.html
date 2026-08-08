@@ -2,6 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
 <title>The Perfumery</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
@@ -100,6 +101,11 @@ header.top{margin-bottom:28px;position:relative;}
 
 /* toolbar */
 .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:22px;}
+@media (max-width:600px){
+  body{padding:24px 16px 60px;}
+  .toolbar{flex-direction:column;align-items:stretch;}
+  .toolbar .search{min-width:0;}
+}
 .search{flex:1;min-width:180px;background:var(--surface);border:1px solid var(--line);color:var(--text);padding:9px 12px;border-radius:2px;font-size:13px;}
 .search:focus{outline:1px solid var(--amber);}
 select.sort{background:var(--surface);border:1px solid var(--line);color:var(--text);padding:9px 10px;border-radius:2px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;}
@@ -272,7 +278,7 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
   <div class="tab-panel hidden" id="panel-consider">
     <p class="subtitle" style="margin-bottom:18px;">Perfumes you're eyeing, with your reasoning and the links you found, so you're not re-researching the same bottle twice.</p>
     <div class="toolbar">
-      <div style="flex:1;"></div>
+      <input class="search" id="c_search" placeholder="Search by name or brand…">
       <button class="btn primary" id="addConsiderBtn">+ Add to consideration</button>
     </div>
     <div class="grid" id="considerGrid"></div>
@@ -421,6 +427,14 @@ const FirestoreStore = {
     const keys = [];
     snaps.forEach(s=>keys.push(s.id));
     return {keys, prefix, shared: !!shared};
+  },
+  async listWithData(prefix, shared){
+    prefix = prefix || '';
+    const q = query(collection(db, KV), where(documentId(), '>=', prefix), where(documentId(), '<', prefix + '\uf8ff'));
+    const snaps = await getDocs(q);
+    const docs = [];
+    snaps.forEach(s=>docs.push({key: s.id, value: s.data().value}));
+    return {docs, prefix, shared: !!shared};
   }
 };
 
@@ -495,13 +509,11 @@ async function loadAll(){
     if(meta && meta.value) vault.nextNo = JSON.parse(meta.value).nextNo || 1;
   }catch(e){ /* no meta yet */ }
   try{
-    const listRes = await FirestoreStore.list('entry:', false);
-    const keys = (listRes && listRes.keys) || [];
-    for(const k of keys){
-      try{
-        const r = await FirestoreStore.get(k, false);
-        if(r && r.value) vault.entries.push(JSON.parse(r.value));
-      }catch(e){ /* skip a single unreadable entry, don't fail the whole load */ }
+    const listRes = await FirestoreStore.listWithData('entry:', false);
+    const docs = (listRes && listRes.docs) || [];
+    for(const d of docs){
+      try{ if(d.value) vault.entries.push(JSON.parse(d.value)); }
+      catch(e){ /* skip a single unreadable entry, don't fail the whole load */ }
     }
   }catch(e){ /* no entries yet */ }
   try{
@@ -988,13 +1000,11 @@ async function loadConsiderations(){
     if(meta && meta.value) considerations.nextNo = JSON.parse(meta.value).nextNo || 1;
   }catch(e){ /* no meta yet */ }
   try{
-    const listRes = await FirestoreStore.list('consider:', false);
-    const keys = (listRes && listRes.keys) || [];
-    for(const k of keys){
-      try{
-        const r = await FirestoreStore.get(k, false);
-        if(r && r.value) considerations.entries.push(JSON.parse(r.value));
-      }catch(e){ /* skip a single unreadable entry */ }
+    const listRes = await FirestoreStore.listWithData('consider:', false);
+    const docs = (listRes && listRes.docs) || [];
+    for(const d of docs){
+      try{ if(d.value) considerations.entries.push(JSON.parse(d.value)); }
+      catch(e){ /* skip a single unreadable entry */ }
     }
   }catch(e){ /* no entries yet */ }
   renderConsiderations();
@@ -1018,11 +1028,17 @@ function verdictClass(v){
 
 function renderConsiderations(){
   const grid = document.getElementById('considerGrid');
+  const q = (document.getElementById('c_search').value || '').trim().toLowerCase();
   if(considerations.entries.length===0){
     grid.innerHTML = `<div class="empty"><h3>Nothing on the list yet</h3><p>Add a perfume you're eyeing before you buy it.</p></div>`;
     return;
   }
-  const list = [...considerations.entries].sort((a,b)=>b.no-a.no);
+  let list = [...considerations.entries].sort((a,b)=>b.no-a.no);
+  if(q) list = list.filter(e=>(e.brand+' '+e.name).toLowerCase().includes(q));
+  if(list.length===0){
+    grid.innerHTML = `<div class="empty"><h3>No matches</h3><p>Nothing in your list matches that search.</p></div>`;
+    return;
+  }
   grid.innerHTML = list.map(e=>`
     <div class="card">
       <div class="card-top">
@@ -1072,6 +1088,7 @@ function openConsiderModal(id){
   requestAnimationFrame(()=>collapseTagRow('c_tagpick', 2));
 }
 document.getElementById('addConsiderBtn').onclick = ()=>openConsiderModal(null);
+document.getElementById('c_search').oninput = renderConsiderations;
 document.getElementById('cancelConsiderModal').onclick = ()=>document.getElementById('considerOverlay').classList.add('hidden');
 
 document.getElementById('saveConsiderEntry').onclick = async ()=>{
