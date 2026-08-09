@@ -97,7 +97,8 @@ header.top{margin-bottom:28px;position:relative;}
 .pfield textarea:focus,.pfield input:focus{outline:1px solid var(--amber);border-color:var(--amber);}
 .profile-save{margin-top:18px;text-align:right;}
 @media (max-width:480px){
-  .profile-tab{top:auto;bottom:20px;right:0;transform:none;writing-mode:horizontal-tb;border-radius:6px 0 0 6px;padding:10px 14px;}
+  .profile-tab{top:auto;bottom:20px;right:0;transform:none;writing-mode:horizontal-tb;border-radius:6px 0 0 6px;padding:10px 14px;transition:transform .3s ease,opacity .3s ease;}
+  .profile-tab.scrolling{transform:translateX(78%);opacity:.55;}
 }
 
 /* toolbar */
@@ -169,6 +170,7 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .stat{text-align:center;}
 .stat .lbl{font-family:'IBM Plex Mono',monospace;font-size:8.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);display:block;margin-bottom:4px;}
 .dots{display:flex;justify-content:center;gap:2px;}
+.ct-cell .dots{flex-direction:row;flex-wrap:nowrap;justify-content:flex-start;gap:3px;}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--line);}
 .dot.on{background:var(--amber);}
 
@@ -576,6 +578,13 @@ function closeProfilePanel(){
   document.getElementById('profileBackdrop').classList.add('hidden');
 }
 document.getElementById('profileTab').onclick = openProfilePanel;
+let profileScrollTimer = null;
+window.addEventListener('scroll', ()=>{
+  const tab = document.getElementById('profileTab');
+  tab.classList.add('scrolling');
+  clearTimeout(profileScrollTimer);
+  profileScrollTimer = setTimeout(()=>{ tab.classList.remove('scrolling'); }, 1000);
+}, {passive:true});
 document.getElementById('profileClose').onclick = closeProfilePanel;
 document.getElementById('profileBackdrop').onclick = closeProfilePanel;
 document.getElementById('saveProfile').onclick = async ()=>{
