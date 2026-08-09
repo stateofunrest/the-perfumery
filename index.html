@@ -141,8 +141,7 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .compare-check.checked::after{content:'✓';color:#17120F;font-size:12px;font-weight:bold;}
 .compare-check.disabled{opacity:.3;cursor:not-allowed;}
 .card.compare-mode{position:relative;}
-.compare-modal{max-width:720px;}
-.compare-table{display:grid;grid-template-columns:110px repeat(auto-fit,minmax(150px,1fr));gap:0;font-size:13px;min-width:500px;}
+.compare-table{display:grid;grid-template-columns:130px repeat(auto-fit,minmax(190px,1fr));gap:0;font-size:13px;min-width:560px;}
 .compare-table .ct-label{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--gold);padding:10px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;}
 .compare-table .ct-cell{padding:10px 8px;border-bottom:1px solid var(--line);border-left:1px solid var(--line);}
 .compare-table .ct-photo{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:2px;background:var(--surface-2);}
@@ -193,6 +192,7 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .overlay{position:fixed;inset:0;background:rgba(10,8,6,.72);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;z-index:50;}
 .overlay.hidden{display:none;}
 .modal{background:var(--surface);border:1px solid var(--line);border-radius:3px;max-width:560px;width:100%;padding:28px;margin-top:10px;}
+.modal.compare-modal{max-width:960px;}
 .modal h2{font-family:'Fraunces',serif;font-weight:600;font-size:22px;margin:0 0 18px;}
 .field{margin-bottom:14px;}
 .field label{display:block;font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--gold);margin-bottom:6px;}
@@ -302,6 +302,11 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
     <div class="toolbar">
       <input class="search" id="c_search" placeholder="Search by name or brand…">
       <button class="btn primary" id="addConsiderBtn">+ Add to consideration</button>
+      <button class="btn" id="c_compareToggleBtn">Compare</button>
+    </div>
+    <div class="compare-bar hidden" id="c_compareBar">
+      <span id="c_compareCount">Select up to 3 to compare</span>
+      <button class="btn primary" id="c_compareGoBtn" disabled>Compare</button>
     </div>
     <div class="grid" id="considerGrid"></div>
   </div>
@@ -1093,6 +1098,9 @@ function verdictClass(v){
   return 'Amber';
 }
 
+let considerCompareMode = false;
+let considerCompareSelected = [];
+
 function renderConsiderations(){
   const grid = document.getElementById('considerGrid');
   const q = (document.getElementById('c_search').value || '').trim().toLowerCase();
@@ -1107,7 +1115,8 @@ function renderConsiderations(){
     return;
   }
   grid.innerHTML = list.map(e=>`
-    <div class="card">
+    <div class="card ${considerCompareMode?'compare-mode':''}">
+      ${considerCompareMode?`<div class="compare-check ${considerCompareSelected.includes(e.id)?'checked':''} ${(!considerCompareSelected.includes(e.id) && considerCompareSelected.length>=3)?'disabled':''}" data-id="${e.id}"></div>`:''}
       <div class="card-top">
         <span class="accession">No. C${String(e.no).padStart(3,'0')}</span>
         <span class="chip ${verdictClass(e.verdict)}">${e.verdict||'Considering'}</span>
@@ -1134,6 +1143,61 @@ function renderConsiderations(){
   grid.querySelectorAll('.edit').forEach(b=>b.onclick=()=>openConsiderModal(b.dataset.id));
   grid.querySelectorAll('.del').forEach(b=>b.onclick=()=>removeConsiderEntry(b.dataset.id));
   grid.querySelectorAll('.move-to-collection').forEach(b=>b.onclick=()=>openMoveToCollectionModal(b.dataset.id));
+  grid.querySelectorAll('.compare-check').forEach(cb=>{
+    cb.onclick = ()=>{
+      const id = cb.dataset.id;
+      if(considerCompareSelected.includes(id)){
+        considerCompareSelected = considerCompareSelected.filter(x=>x!==id);
+      } else {
+        if(considerCompareSelected.length >= 3) return;
+        considerCompareSelected.push(id);
+      }
+      updateConsiderCompareBar();
+      renderConsiderations();
+    };
+  });
+}
+
+function updateConsiderCompareBar(){
+  const bar = document.getElementById('c_compareBar');
+  const count = document.getElementById('c_compareCount');
+  const goBtn = document.getElementById('c_compareGoBtn');
+  if(!considerCompareMode){ bar.classList.add('hidden'); return; }
+  bar.classList.remove('hidden');
+  count.textContent = considerCompareSelected.length===0
+    ? 'Select up to 3 to compare'
+    : `${considerCompareSelected.length} of 3 selected`;
+  goBtn.disabled = considerCompareSelected.length < 2;
+}
+document.getElementById('c_compareToggleBtn').onclick = ()=>{
+  considerCompareMode = !considerCompareMode;
+  if(!considerCompareMode) considerCompareSelected = [];
+  document.getElementById('c_compareToggleBtn').textContent = considerCompareMode ? 'Cancel compare' : 'Compare';
+  updateConsiderCompareBar();
+  renderConsiderations();
+};
+document.getElementById('c_compareGoBtn').onclick = ()=>openConsiderCompareModal();
+
+function openConsiderCompareModal(){
+  const items = considerCompareSelected.map(id=>considerations.entries.find(e=>e.id===id)).filter(Boolean);
+  if(items.length < 2) return;
+  const rows = [
+    {label:'', render:e=> e.photo?`<img class="ct-photo" src="${e.photo}">`:svgBottle()},
+    {label:'Perfume', render:e=>`<div class="ct-brand">${e.brand}</div><div class="ct-name">${e.name}</div>`},
+    {label:'Status', render:e=>e.verdict||'Considering'},
+    {label:'Tags', render:e=>`<div class="chips">${(e.tags||[]).map(t=>chipHtml(t)).join('')}</div>`},
+    {label:'Lowest price', render:e=>e.lowestPrice||'—'},
+    {label:'Notes', render:e=>e.notes||'—'},
+  ];
+  const cols = `130px repeat(${items.length}, minmax(190px,1fr))`;
+  let html = `<div class="compare-table" style="grid-template-columns:${cols};">`;
+  rows.forEach(row=>{
+    html += `<div class="ct-label">${row.label}</div>`;
+    items.forEach(e=>{ html += `<div class="ct-cell">${row.render(e)}</div>`; });
+  });
+  html += `</div>`;
+  document.getElementById('compareTableWrap').innerHTML = html;
+  document.getElementById('compareOverlay').classList.remove('hidden');
 }
 
 function openConsiderModal(id){
