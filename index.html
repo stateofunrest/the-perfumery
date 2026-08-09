@@ -134,6 +134,20 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .card{background:var(--surface);border:1px solid var(--line);border-radius:3px;position:relative;overflow:hidden;display:flex;flex-direction:column;transition:.2s border-color;}
 .card:hover{border-color:var(--gold);}
 .card-top{display:flex;justify-content:space-between;align-items:flex-start;padding:12px 14px 0;}
+.compare-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface);border:1px solid var(--gold);border-radius:2px;padding:10px 14px;margin-bottom:16px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--text-muted);}
+.compare-bar.hidden{display:none;}
+.compare-check{position:absolute;top:10px;left:10px;width:22px;height:22px;border-radius:50%;border:2px solid var(--line);background:var(--surface);cursor:pointer;z-index:5;display:flex;align-items:center;justify-content:center;transition:.15s;}
+.compare-check.checked{background:var(--accent-gradient);border-color:transparent;}
+.compare-check.checked::after{content:'✓';color:#17120F;font-size:12px;font-weight:bold;}
+.compare-check.disabled{opacity:.3;cursor:not-allowed;}
+.card.compare-mode{position:relative;}
+.compare-modal{max-width:720px;}
+.compare-table{display:grid;grid-template-columns:110px repeat(auto-fit,minmax(150px,1fr));gap:0;font-size:13px;min-width:500px;}
+.compare-table .ct-label{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--gold);padding:10px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;}
+.compare-table .ct-cell{padding:10px 8px;border-bottom:1px solid var(--line);border-left:1px solid var(--line);}
+.compare-table .ct-photo{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:2px;background:var(--surface-2);}
+.compare-table .ct-name{font-family:'Fraunces',serif;font-weight:600;font-size:15px;}
+.compare-table .ct-brand{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-muted);text-transform:uppercase;}
 .accession{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-muted);letter-spacing:.05em;}
 .photo{margin:10px 14px 0;aspect-ratio:1/1;background:var(--surface-2);border:1px solid var(--line);border-radius:2px;display:flex;align-items:center;justify-content:center;overflow:hidden;}
 .photo img{width:100%;height:100%;object-fit:cover;}
@@ -167,6 +181,8 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .card-actions a.lookup:hover{background:var(--amber);color:#17120F;}
 .card-actions{display:flex;gap:8px;padding:0 14px 14px;margin-top:auto;flex-wrap:wrap;}
 .card-actions button{flex:1;background:transparent;border:1px solid var(--line);color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:11px;padding:7px;border-radius:2px;cursor:pointer;}
+.card-actions button.move-to-collection{border-color:var(--amber);color:var(--amber);}
+.card-actions button.move-to-collection:hover{background:var(--accent-gradient);color:#17120F;border-color:transparent;}
 .card-actions button:hover{border-color:var(--amber);color:var(--amber);}
 .card-actions button.del:hover{border-color:var(--danger);color:var(--danger);}
 
@@ -270,6 +286,11 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
         <option value="price">Sort: price</option>
       </select>
       <button class="btn primary" id="addBtn">+ Add perfume</button>
+      <button class="btn" id="compareToggleBtn">Compare</button>
+    </div>
+    <div class="compare-bar hidden" id="compareBar">
+      <span id="compareCount">Select up to 3 to compare</span>
+      <button class="btn primary" id="compareGoBtn" disabled>Compare</button>
     </div>
     <div class="tagbar" id="tagbar"></div>
     <div id="loadingMsg" class="loading">Opening the perfumery…</div>
@@ -283,6 +304,16 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
       <button class="btn primary" id="addConsiderBtn">+ Add to consideration</button>
     </div>
     <div class="grid" id="considerGrid"></div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="compareOverlay">
+  <div class="modal compare-modal">
+    <div class="modal-actions" style="justify-content:space-between;margin-top:0;margin-bottom:16px;">
+      <h2 style="margin:0;">Comparing</h2>
+      <button class="btn ghost" id="closeCompare">Close</button>
+    </div>
+    <div id="compareTableWrap" style="overflow-x:auto;"></div>
   </div>
 </div>
 
@@ -498,6 +529,7 @@ let activeFilters = new Set();
 let editingId = null;
 let pendingPhoto = null;
 let pendingConsiderPhoto = null;
+let movingFromConsiderId = null;
 
 function svgBottle(){
   return '<svg viewBox="0 0 24 24" fill="none" stroke="#A5978A" stroke-width="1.2"><path d="M9 2h6M10 2v3.2c0 .5-.2.9-.5 1.3L8 8.5c-.5.6-.8 1.4-.8 2.2V20a2 2 0 0 0 2 2h5.6a2 2 0 0 0 2-2v-9.3c0-.8-.3-1.6-.8-2.2l-1.5-2c-.3-.4-.5-.8-.5-1.3V2"/></svg>';
@@ -645,6 +677,9 @@ function dots(v){
   return h;
 }
 
+let compareMode = false;
+let compareSelected = [];
+
 function render(){
   const grid = document.getElementById('grid');
   const q = document.getElementById('search').value.trim().toLowerCase();
@@ -665,7 +700,8 @@ function render(){
     return;
   }
   grid.innerHTML = list.map(e=>`
-    <div class="card">
+    <div class="card ${compareMode?'compare-mode':''}">
+      ${compareMode?`<div class="compare-check ${compareSelected.includes(e.id)?'checked':''} ${(!compareSelected.includes(e.id) && compareSelected.length>=3)?'disabled':''}" data-id="${e.id}"></div>`:''}
       <div class="card-top">
         <span class="accession">No. ${String(e.no).padStart(3,'0')}</span>
       </div>
@@ -696,7 +732,69 @@ function render(){
 
   grid.querySelectorAll('.edit').forEach(b=>b.onclick=()=>openModal(b.dataset.id));
   grid.querySelectorAll('.del').forEach(b=>b.onclick=()=>removeEntry(b.dataset.id));
+  grid.querySelectorAll('.compare-check').forEach(cb=>{
+    cb.onclick = ()=>{
+      const id = cb.dataset.id;
+      if(compareSelected.includes(id)){
+        compareSelected = compareSelected.filter(x=>x!==id);
+      } else {
+        if(compareSelected.length >= 3) return;
+        compareSelected.push(id);
+      }
+      updateCompareBar();
+      render();
+    };
+  });
 }
+
+function updateCompareBar(){
+  const bar = document.getElementById('compareBar');
+  const count = document.getElementById('compareCount');
+  const goBtn = document.getElementById('compareGoBtn');
+  if(!compareMode){ bar.classList.add('hidden'); return; }
+  bar.classList.remove('hidden');
+  count.textContent = compareSelected.length===0
+    ? 'Select up to 3 to compare'
+    : `${compareSelected.length} of 3 selected`;
+  goBtn.disabled = compareSelected.length < 2;
+}
+document.getElementById('compareToggleBtn').onclick = ()=>{
+  compareMode = !compareMode;
+  if(!compareMode) compareSelected = [];
+  document.getElementById('compareToggleBtn').textContent = compareMode ? 'Cancel compare' : 'Compare';
+  updateCompareBar();
+  render();
+};
+document.getElementById('compareGoBtn').onclick = ()=>openCompareModal();
+function openCompareModal(){
+  const items = compareSelected.map(id=>vault.entries.find(e=>e.id===id)).filter(Boolean);
+  if(items.length < 2) return;
+  const rows = [
+    {label:'', render:e=> e.photo?`<img class="ct-photo" src="${e.photo}">`:svgBottle()},
+    {label:'Perfume', render:e=>`<div class="ct-brand">${e.brand}</div><div class="ct-name">${e.name}</div>`},
+    {label:'Rating', render:e=>starRow(e.overall)},
+    {label:'Longevity', render:e=>dots(e.longevity)},
+    {label:'Projection', render:e=>dots(e.projection)},
+    {label:'Quality', render:e=>dots(e.quality)},
+    {label:'Format', render:e=>e.format||'—'},
+    {label:'Price', render:e=>e.price||'—'},
+    {label:'Skin feel', render:e=>e.sting?'⚠ stings':'✓ sits clean'},
+    {label:'Tags', render:e=>`<div class="chips">${(e.tags||[]).map(t=>chipHtml(t)).join('')}</div>`},
+    {label:'Notes', render:e=>e.notes||'—'},
+  ];
+  const cols = `110px repeat(${items.length}, minmax(150px,1fr))`;
+  let html = `<div class="compare-table" style="grid-template-columns:${cols};">`;
+  rows.forEach(row=>{
+    html += `<div class="ct-label">${row.label}</div>`;
+    items.forEach(e=>{ html += `<div class="ct-cell">${row.render(e)}</div>`; });
+  });
+  html += `</div>`;
+  document.getElementById('compareTableWrap').innerHTML = html;
+  document.getElementById('compareOverlay').classList.remove('hidden');
+}
+document.getElementById('closeCompare').onclick = ()=>{
+  document.getElementById('compareOverlay').classList.add('hidden');
+};
 
 document.getElementById('search').oninput = render;
 document.getElementById('sortSel').onchange = ()=>{
@@ -822,6 +920,7 @@ document.getElementById('c_photoInput').onchange = (e)=>{
 
 function openModal(id){
   editingId = id || null;
+  movingFromConsiderId = null;
   pendingPhoto = null;
   const e = id ? vault.entries.find(x=>x.id===id) : null;
   document.getElementById('modalTitle').textContent = e ? 'Edit perfume' : 'Add a perfume';
@@ -847,7 +946,39 @@ function openModal(id){
   requestAnimationFrame(()=>collapseTagRow('tagpick', 2));
 }
 document.getElementById('addBtn').onclick = ()=>openModal(null);
-document.getElementById('cancelModal').onclick = ()=>document.getElementById('overlay').classList.add('hidden');
+document.getElementById('cancelModal').onclick = ()=>{
+  movingFromConsiderId = null;
+  document.getElementById('overlay').classList.add('hidden');
+};
+
+function openMoveToCollectionModal(considerId){
+  const c = considerations.entries.find(x=>x.id===considerId);
+  if(!c) return;
+  editingId = null;
+  movingFromConsiderId = considerId;
+  pendingPhoto = c.photo || null;
+  document.getElementById('modalTitle').textContent = 'Welcome to the collection';
+  document.getElementById('f_brand').value = c.brand || '';
+  document.getElementById('f_name').value = c.name || '';
+  document.getElementById('f_format').value = 'EDP';
+  document.getElementById('f_price').value = c.lowestPrice || '';
+  document.getElementById('f_overall').value = 1;
+  document.getElementById('f_longevity').value = 1;
+  document.getElementById('lv_val').textContent = 1;
+  document.getElementById('f_projection').value = 1;
+  document.getElementById('pj_val').textContent = 1;
+  document.getElementById('f_quality').value = 1;
+  document.getElementById('sq_val').textContent = 1;
+  document.getElementById('f_stingYes').checked = false;
+  document.getElementById('f_stingNo').checked = true;
+  document.getElementById('f_notes').value = c.notes || '';
+  const prev = document.getElementById('f_photoPreview');
+  if(c.photo){ prev.src = c.photo; prev.style.display='block'; }
+  else { prev.style.display='none'; prev.src=''; }
+  buildTagpick(c.tags || []);
+  document.getElementById('overlay').classList.remove('hidden');
+  requestAnimationFrame(()=>collapseTagRow('tagpick', 2));
+}
 
 document.getElementById('saveEntry').onclick = async ()=>{
   const brand = document.getElementById('f_brand').value.trim();
@@ -877,6 +1008,14 @@ document.getElementById('saveEntry').onclick = async ()=>{
     await saveMeta();
   }
   document.getElementById('overlay').classList.add('hidden');
+  if(movingFromConsiderId){
+    const removedId = movingFromConsiderId;
+    movingFromConsiderId = null;
+    considerations.entries = considerations.entries.filter(e=>e.id!==removedId);
+    await deleteConsiderEntryFromStorage(removedId);
+    renderConsiderations();
+    switchTab('collection');
+  }
   render();
 };
 
@@ -986,6 +1125,7 @@ function renderConsiderations(){
       </div>
       <div class="card-actions">
         <a class="lookup" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(e.brand+' '+e.name+' perfume price')}">Look up online ↗</a>
+        <button class="move-to-collection" data-id="${e.id}">I bought this ✓</button>
         <button class="edit" data-id="${e.id}">Edit</button>
         <button class="del" data-id="${e.id}">Remove</button>
       </div>
@@ -993,6 +1133,7 @@ function renderConsiderations(){
   `).join('');
   grid.querySelectorAll('.edit').forEach(b=>b.onclick=()=>openConsiderModal(b.dataset.id));
   grid.querySelectorAll('.del').forEach(b=>b.onclick=()=>removeConsiderEntry(b.dataset.id));
+  grid.querySelectorAll('.move-to-collection').forEach(b=>b.onclick=()=>openMoveToCollectionModal(b.dataset.id));
 }
 
 function openConsiderModal(id){
