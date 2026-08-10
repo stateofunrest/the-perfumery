@@ -188,6 +188,17 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .card-actions button.del:hover{border-color:var(--danger);color:var(--danger);}
 
 .empty{grid-column:1/-1;text-align:center;padding:70px 20px;color:var(--text-muted);}
+
+/* glossary */
+.glossary{margin-top:60px;padding-top:36px;border-top:1px solid var(--line);}
+.glossary-head h2{font-family:'Fraunces',serif;font-weight:500;font-size:26px;margin:6px 0 8px;}
+.glossary-search{width:100%;max-width:340px;margin:18px 0 22px;}
+.glossary-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px 28px;}
+.gterm{border-bottom:1px solid var(--line);padding-bottom:14px;}
+.gterm-name{font-family:'Fraunces',serif;font-weight:600;font-size:15.5px;color:var(--text);margin-bottom:4px;}
+.gterm-def{font-size:13px;color:var(--text-muted);line-height:1.5;}
+.gterm-cat{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:4px;}
+.glossary-empty{grid-column:1/-1;text-align:center;color:var(--text-muted);padding:30px;}
 .empty h3{font-family:'Fraunces',serif;color:var(--text);font-size:20px;margin-bottom:6px;}
 
 /* modal */
@@ -312,6 +323,16 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
     </div>
     <div class="grid" id="considerGrid"></div>
   </div>
+
+  <section class="glossary" id="glossarySection">
+    <div class="glossary-head">
+      <div class="eyebrow">For reference</div>
+      <h2>Scent Glossary</h2>
+      <p class="subtitle">Concentrations, performance terms, note structure, families, and the industry language that shows up on every bottle and every review.</p>
+    </div>
+    <input class="search glossary-search" id="glossarySearch" placeholder="Search a term…">
+    <div id="glossaryList" class="glossary-list"></div>
+  </section>
 </div>
 
 <div class="overlay hidden" id="compareOverlay">
@@ -917,6 +938,10 @@ function handlePhotoInput(file, onDone){
   };
   reader.readAsDataURL(file);
 }
+document.getElementById('f_price').addEventListener('input', handlePriceInput);
+document.getElementById('f_price').addEventListener('focus', handlePriceFocus);
+document.getElementById('c_lowestPrice').addEventListener('input', handlePriceInput);
+document.getElementById('c_lowestPrice').addEventListener('focus', handlePriceFocus);
 document.getElementById('f_photoInput').onchange = (e)=>{
   handlePhotoInput(e.target.files[0], (dataUrl)=>{
     pendingPhoto = dataUrl;
@@ -941,7 +966,7 @@ function openModal(id){
   document.getElementById('f_brand').value = e?.brand || '';
   document.getElementById('f_name').value = e?.name || '';
   document.getElementById('f_format').value = e?.format || 'EDP';
-  document.getElementById('f_price').value = e?.price || '';
+  document.getElementById('f_price').value = e ? normalizePriceValue(e.price || '') : '₹';
   document.getElementById('f_overall').value = e?.overall || 1;
   document.getElementById('f_longevity').value = e?.longevity || 1;
   document.getElementById('lv_val').textContent = e?.longevity || 1;
@@ -975,7 +1000,7 @@ function openMoveToCollectionModal(considerId){
   document.getElementById('f_brand').value = c.brand || '';
   document.getElementById('f_name').value = c.name || '';
   document.getElementById('f_format').value = 'EDP';
-  document.getElementById('f_price').value = c.lowestPrice || '';
+  document.getElementById('f_price').value = normalizePriceValue(c.lowestPrice || '₹');
   document.getElementById('f_overall').value = 1;
   document.getElementById('f_longevity').value = 1;
   document.getElementById('lv_val').textContent = 1;
@@ -1003,7 +1028,7 @@ document.getElementById('saveEntry').onclick = async ()=>{
     photo: pendingPhoto,
     tags: getPickedTags(),
     format: document.getElementById('f_format').value,
-    price: document.getElementById('f_price').value.trim(),
+    price: cleanEmptyPrice(document.getElementById('f_price').value),
     overall: parseFloat(document.getElementById('f_overall').value),
     longevity: parseInt(document.getElementById('f_longevity').value),
     projection: parseInt(document.getElementById('f_projection').value),
@@ -1091,6 +1116,127 @@ async function deleteConsiderEntryFromStorage(id){
   try{ await FirestoreStore.delete('consider:'+id, false); }
   catch(e){ console.error('delete failed', e); }
 }
+function formatIndianNumber(numStr){
+  numStr = (numStr||'').replace(/\D/g,'');
+  if(!numStr) return '';
+  numStr = numStr.replace(/^0+(?=\d)/,'');
+  let lastThree = numStr.slice(-3);
+  let other = numStr.slice(0, -3);
+  if(other) lastThree = ',' + lastThree;
+  const otherFormatted = other.replace(/\B(?=(\d{2})+(?!\d))/g, ',');
+  return otherFormatted + lastThree;
+}
+function normalizePriceValue(val){
+  val = val || '';
+  const m = val.match(/^([^\d]*)([\d,]*)/);
+  let prefix = (m && m[1] !== undefined) ? m[1] : '';
+  const numPart = (m && m[2]) ? m[2] : '';
+  if(prefix.trim() === '' ) prefix = numPart ? '₹' : '';
+  const digitsOnly = numPart.replace(/,/g,'');
+  const formattedNum = prefix.trim()==='₹' ? formatIndianNumber(digitsOnly) : digitsOnly;
+  return prefix + formattedNum;
+}
+function handlePriceInput(ev){
+  const el = ev.target;
+  const cursorWasAtEnd = el.selectionStart === el.value.length;
+  el.value = normalizePriceValue(el.value);
+  if(cursorWasAtEnd) el.setSelectionRange(el.value.length, el.value.length);
+}
+function handlePriceFocus(ev){
+  const el = ev.target;
+  if(el.value.trim() === ''){
+    el.value = '₹';
+    el.setSelectionRange(el.value.length, el.value.length);
+  }
+}
+
+function cleanEmptyPrice(val){
+  val = (val||'').trim();
+  return /\d/.test(val) ? val : '';
+}
+
+const GLOSSARY = [
+  {t:`Eau de Parfum (EDP)`, c:`Concentration`, d:`Typically 15–20% fragrance concentrate diluted in alcohol — the most common modern strength, balancing longevity and cost.`},
+  {t:`Eau de Toilette (EDT)`, c:`Concentration`, d:`Roughly 5–15% concentrate — lighter and less long-lasting than EDP, common for daytime and summer scents.`},
+  {t:`Eau de Cologne (EDC)`, c:`Concentration`, d:`Around 2–5% concentrate — very light and short-lived, the original strength historically used for citrus-based colognes.`},
+  {t:`Eau Fraiche`, c:`Concentration`, d:`The lightest strength, often under 3% concentrate, and sometimes water-based rather than alcohol-based.`},
+  {t:`Parfum / Extrait de Parfum`, c:`Concentration`, d:`The most concentrated form, typically 20–40% — the richest, longest-lasting, and usually most expensive strength.`},
+  {t:`Attar / Ittar`, c:`Concentration`, d:`Traditional oil-based perfume, historically distilled directly into a carrier oil rather than alcohol; common in Middle Eastern and South Asian perfumery.`},
+  {t:`Perfume Oil`, c:`Concentration`, d:`Alcohol-free concentrate diluted in a carrier oil rather than alcohol or water; tends to sit closer to the skin and behave differently than a spray.`},
+  {t:`Projection`, c:`Performance`, d:`How far a scent radiates from the skin into the surrounding air. High projection can be smelled from a distance; low projection stays close.`},
+  {t:`Sillage`, c:`Performance`, d:`French for "wake," as in a boat's wake — the scent trail left behind as someone moves, distinct from projection at rest.`},
+  {t:`Longevity`, c:`Performance`, d:`How long a fragrance stays detectable on skin before fading completely.`},
+  {t:`Skin Scent`, c:`Performance`, d:`A fragrance with very low projection that can only be smelled up close, almost blending into the wearer's own scent.`},
+  {t:`Beast Mode`, c:`Performance`, d:`Slang for an especially loud, high-projection version or batch of a fragrance known for performing far beyond the norm.`},
+  {t:`Linear`, c:`Performance`, d:`A fragrance that smells largely the same from application to fade, without much evolution through its notes.`},
+  {t:`Dynamic / Evolving`, c:`Performance`, d:`The opposite of linear — a scent that changes noticeably as it moves from top to base notes over time.`},
+  {t:`Top Notes (Head Notes)`, c:`Structure`, d:`The first scents perceived right after application — light, volatile ingredients like citrus that fade within minutes.`},
+  {t:`Middle Notes (Heart Notes)`, c:`Structure`, d:`The notes that emerge once the top notes fade, forming the main body of the fragrance — often floral or spicy.`},
+  {t:`Base Notes`, c:`Structure`, d:`The deepest, longest-lasting notes that anchor a fragrance, typically woods, musks, and resins that can last for hours.`},
+  {t:`Note Pyramid`, c:`Structure`, d:`The visual representation of a fragrance's top, middle, and base notes, usually shown as a triangle in marketing material.`},
+  {t:`Dry-Down`, c:`Structure`, d:`The final phase of a fragrance's development, once the top and most middle notes have faded, leaving mostly base notes.`},
+  {t:`Opening`, c:`Structure`, d:`The very first impression of a fragrance on application, dominated by its top notes.`},
+  {t:`Accord`, c:`Structure`, d:`A blend of several individual notes combined to create one unified new scent impression — an "amber accord" is built, not a single ingredient.`},
+  {t:`Facet`, c:`Structure`, d:`A particular character within a note or accord — for example, a "green facet" running through a floral note.`},
+  {t:`Fougère`, c:`Family`, d:`French for "fern" — built on lavender, coumarin, and oakmoss; one of the oldest classic fragrance families.`},
+  {t:`Chypre`, c:`Family`, d:`French for "Cyprus" — a mossy, woody family typically built on bergamot, oakmoss, and labdanum.`},
+  {t:`Oriental / Amber`, c:`Family`, d:`A warm, resinous family built around amber, vanilla, and balsamic notes; often called "ambery" in modern classification.`},
+  {t:`Woody`, c:`Family`, d:`Built around wood-derived notes like cedar, sandalwood, and vetiver.`},
+  {t:`Gourmand`, c:`Family`, d:`Built around edible, dessert-like notes such as vanilla, caramel, chocolate, and tonka bean.`},
+  {t:`Floral`, c:`Family`, d:`Built primarily around flower notes, whether a single flower (soliflore) or a bouquet of several.`},
+  {t:`Aromatic`, c:`Family`, d:`Built around herbal notes like lavender, sage, and rosemary.`},
+  {t:`Citrus / Hesperidic`, c:`Family`, d:`Built around citrus fruit notes like bergamot, lemon, and orange — the basis of the earliest colognes.`},
+  {t:`Aquatic / Ozonic`, c:`Family`, d:`Built around clean, "sea air" or "rain"-type synthetic notes, common in 1990s–2000s fragrances.`},
+  {t:`Green`, c:`Family`, d:`Built around notes evoking cut grass, crushed leaves, and stems.`},
+  {t:`Leather`, c:`Family`, d:`Built around smoky, animalic leather-like notes.`},
+  {t:`Animalic`, c:`Family`, d:`Notes derived from, or evoking, animal-derived materials like musk, civet, and castoreum — now mostly recreated synthetically.`},
+  {t:`Powdery`, c:`Family`, d:`Notes evoking the soft, cosmetic smell of makeup powder, often from iris or heliotrope.`},
+  {t:`Fruity`, c:`Family`, d:`Built around non-citrus fruit notes like berries, apple, and peach.`},
+  {t:`Spicy`, c:`Family`, d:`Built around spice notes like cinnamon, clove, cardamom, and pepper.`},
+  {t:`Nose (Perfumer)`, c:`Industry`, d:`The trained professional who creates fragrance formulas, named for their highly developed sense of smell.`},
+  {t:`Absolute`, c:`Industry`, d:`A highly concentrated aromatic extract obtained through solvent extraction — more concentrated than an essential oil.`},
+  {t:`Essential Oil`, c:`Industry`, d:`A natural aromatic extract typically obtained by steam-distilling plant material.`},
+  {t:`Concrete`, c:`Industry`, d:`A waxy, solid aromatic extract that is an intermediate step in producing an absolute.`},
+  {t:`Isolate`, c:`Industry`, d:`A single aromatic compound isolated from a natural material, used as a building block in a formula.`},
+  {t:`Aroma Chemical`, c:`Industry`, d:`A synthetic or nature-identical compound used in perfumery, as opposed to a natural extract.`},
+  {t:`Fixative`, c:`Industry`, d:`An ingredient, often a base note like musk or resin, that slows the evaporation of lighter notes and extends a fragrance's longevity.`},
+  {t:`Maceration`, c:`Industry`, d:`The resting period after a fragrance concentrate is blended with alcohol, letting the ingredients meld before bottling.`},
+  {t:`Distillation`, c:`Industry`, d:`The process of extracting aromatic compounds from raw material using heat and steam.`},
+  {t:`Enfleurage`, c:`Industry`, d:`A traditional, labor-intensive extraction method using odorless fats to absorb a flower's scent, largely replaced by solvent extraction today.`},
+  {t:`IFRA`, c:`Industry`, d:`The International Fragrance Association — the body that sets safety standards and restricts or bans certain ingredients in commercial perfumery.`},
+  {t:`Reformulation`, c:`Industry`, d:`When a brand changes a fragrance's formula, often due to ingredient restrictions or cost, sometimes noticeably altering the original scent.`},
+  {t:`Batch Variation`, c:`Industry`, d:`Small differences between production batches of the same fragrance, from natural ingredient variability or gradual reformulation.`},
+  {t:`Vintage`, c:`Industry`, d:`An older formulation made before a known reformulation, often sought after for a different — sometimes preferred — scent profile.`},
+  {t:`Niche`, c:`Buying`, d:`Fragrance houses operating outside mainstream mass distribution — typically smaller-batch, higher-priced, and more experimental than designer brands.`},
+  {t:`Designer`, c:`Buying`, d:`Fragrances released by mainstream fashion or luxury houses, widely distributed and usually more accessible in price than niche.`},
+  {t:`Indie`, c:`Buying`, d:`Independent, often small-batch perfumers operating outside both major niche and designer distribution.`},
+  {t:`Clone / Dupe`, c:`Buying`, d:`A fragrance deliberately formulated to closely resemble a more expensive existing release, usually at a lower price.`},
+  {t:`Flanker`, c:`Buying`, d:`A new release built on an existing successful fragrance's name and bottle, with a modified formula — like an "Intense" or "Eau Fraiche" edition.`},
+  {t:`Blind Buy`, c:`Buying`, d:`Purchasing a fragrance without smelling it first, based on notes, reviews, or reputation alone.`},
+  {t:`Decant`, c:`Buying`, d:`A small sample portion of a fragrance transferred from a full bottle into a smaller container, often sold or shared for trying a scent without buying the whole bottle.`},
+  {t:`Batch Code`, c:`Buying`, d:`The manufacturing code printed on a bottle, used to identify its production date and formulation era.`},
+  {t:`Discontinued`, c:`Buying`, d:`A fragrance no longer produced by its brand, sometimes becoming rare or valuable among collectors.`},
+];
+function renderGlossary(filter){
+  filter = (filter||'').trim().toLowerCase();
+  const list = document.getElementById('glossaryList');
+  const items = GLOSSARY.filter(g=> !filter || g.t.toLowerCase().includes(filter) || g.d.toLowerCase().includes(filter) || g.c.toLowerCase().includes(filter));
+  const sorted = [...items].sort((a,b)=>a.t.localeCompare(b.t));
+  if(sorted.length===0){
+    list.innerHTML = `<div class="glossary-empty">No terms match that search.</div>`;
+    return;
+  }
+  list.innerHTML = sorted.map(g=>`
+    <div class="gterm">
+      <div class="gterm-cat">${g.c}</div>
+      <div class="gterm-name">${g.t}</div>
+      <div class="gterm-def">${g.d}</div>
+    </div>
+  `).join('');
+}
+document.getElementById('glossarySearch').oninput = (e)=>renderGlossary(e.target.value);
+renderGlossary('');
+
 function safeUrl(u){
   if(!u) return '#';
   return /^https?:\/\//i.test(u) ? u : 'https://'+u;
@@ -1218,7 +1364,7 @@ function openConsiderModal(id){
   document.getElementById('c_name').value = e?.name || '';
   document.getElementById('c_verdict').value = e?.verdict || 'Considering';
   document.getElementById('c_notes').value = e?.notes || '';
-  document.getElementById('c_lowestPrice').value = e?.lowestPrice || '';
+  document.getElementById('c_lowestPrice').value = e ? normalizePriceValue(e.lowestPrice || '') : '₹';
   document.getElementById('c_link1').value = e?.link1 || '';
   document.getElementById('c_link2').value = e?.link2 || '';
   document.getElementById('c_link3').value = e?.link3 || '';
@@ -1244,7 +1390,7 @@ document.getElementById('saveConsiderEntry').onclick = async ()=>{
     tags: getPickedTags('c_tagpick'),
     verdict: document.getElementById('c_verdict').value,
     notes: document.getElementById('c_notes').value.trim(),
-    lowestPrice: document.getElementById('c_lowestPrice').value.trim(),
+    lowestPrice: cleanEmptyPrice(document.getElementById('c_lowestPrice').value),
     link1: document.getElementById('c_link1').value.trim(),
     link2: document.getElementById('c_link2').value.trim(),
     link3: document.getElementById('c_link3').value.trim(),
