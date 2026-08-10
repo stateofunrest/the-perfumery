@@ -82,6 +82,14 @@ header.top{margin-bottom:28px;position:relative;}
 /* scent profile — side tab + slide-out panel */
 .profile-tab{position:fixed;top:50%;right:0;transform:translateY(-50%) rotate(180deg);writing-mode:vertical-rl;background:var(--surface);border:1px solid var(--line);border-right:none;border-radius:6px 0 0 6px;padding:16px 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);cursor:pointer;z-index:40;transition:.15s;}
 .profile-tab:hover{color:var(--amber);border-color:var(--amber);}
+.back-to-top{position:fixed;bottom:24px;left:24px;z-index:40;background:var(--surface);border:1px solid var(--line);border-radius:50%;width:52px;height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);transition:opacity .2s ease,transform .15s ease,border-color .15s ease;}
+.back-to-top:hover{border-color:var(--amber);color:var(--amber);}
+.back-to-top.hidden{opacity:0;pointer-events:none;transform:translateY(10px);}
+.back-to-top .bt-arrow{font-size:16px;line-height:1;}
+.back-to-top .bt-label{font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:.05em;margin-top:2px;}
+@media (max-width:480px){
+  .back-to-top{width:44px;height:44px;bottom:20px;left:16px;}
+}
 .profile-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:49;}
 .profile-backdrop.hidden{display:none;}
 .profile-panel{position:fixed;top:0;right:0;height:100vh;width:360px;max-width:90vw;background:var(--surface);border-left:1px solid var(--line);box-shadow:none;z-index:50;padding:24px;overflow-y:auto;transform:translateX(100%);transition:transform .25s ease;}
@@ -191,9 +199,13 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 
 /* glossary */
 .glossary{margin-top:60px;padding-top:36px;border-top:1px solid var(--line);}
-.glossary-head h2{font-family:'Fraunces',serif;font-weight:500;font-size:26px;margin:6px 0 8px;}
+.glossary-head{background:none;border:none;text-align:left;padding:0;cursor:pointer;width:100%;display:block;}
+.glossary-head h2{font-family:'Fraunces',serif;font-weight:500;font-size:26px;margin:6px 0 8px;display:flex;align-items:center;gap:10px;}
+.glossary-arrow{font-size:16px;color:var(--gold);transition:transform .2s ease;display:inline-block;}
+.glossary-arrow.open{transform:rotate(180deg);}
 .glossary-search{width:100%;max-width:340px;margin:18px 0 22px;}
 .glossary-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px 28px;}
+.glossary-list.collapsed{display:none;}
 .gterm{border-bottom:1px solid var(--line);padding-bottom:14px;}
 .gterm-name{font-family:'Fraunces',serif;font-weight:600;font-size:15.5px;color:var(--text);margin-bottom:4px;}
 .gterm-def{font-size:13px;color:var(--text-muted);line-height:1.5;}
@@ -266,6 +278,10 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 
   <button type="button" class="profile-tab" id="profileTab">Scent Profile</button>
   <div class="profile-backdrop hidden" id="profileBackdrop"></div>
+  <button type="button" class="back-to-top hidden" id="backToTop" aria-label="Back to top">
+    <span class="bt-arrow">↑</span>
+    <span class="bt-label">TOP</span>
+  </button>
   <div class="profile-panel" id="profilePanel">
     <div class="profile-panel-head">
       <h2>Scent Profile</h2>
@@ -325,13 +341,14 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
   </div>
 
   <section class="glossary" id="glossarySection">
-    <div class="glossary-head">
-      <div class="eyebrow">For reference</div>
-      <h2>Scent Glossary</h2>
-      <p class="subtitle">Concentrations, performance terms, note structure, families, and the industry language that shows up on every bottle and every review.</p>
-    </div>
+    <button type="button" class="glossary-head" id="glossaryToggle">
+      <div>
+        <div class="eyebrow">For reference</div>
+        <h2>Scent Glossary <span class="glossary-arrow" id="glossaryArrow">▾</span></h2>
+      </div>
+    </button>
     <input class="search glossary-search" id="glossarySearch" placeholder="Search a term…">
-    <div id="glossaryList" class="glossary-list"></div>
+    <div id="glossaryList" class="glossary-list collapsed"></div>
   </section>
 </div>
 
@@ -598,6 +615,14 @@ function closeProfilePanel(){
   document.getElementById('profilePanel').classList.remove('open');
   document.getElementById('profileBackdrop').classList.add('hidden');
 }
+window.addEventListener('scroll', ()=>{
+  const btn = document.getElementById('backToTop');
+  if(window.scrollY > 400) btn.classList.remove('hidden');
+  else btn.classList.add('hidden');
+}, {passive:true});
+document.getElementById('backToTop').onclick = ()=>{
+  window.scrollTo({top:0, behavior:'smooth'});
+};
 document.getElementById('profileTab').onclick = openProfilePanel;
 let profileScrollTimer = null;
 window.addEventListener('scroll', ()=>{
@@ -1234,8 +1259,18 @@ function renderGlossary(filter){
     </div>
   `).join('');
 }
-document.getElementById('glossarySearch').oninput = (e)=>renderGlossary(e.target.value);
+document.getElementById('glossarySearch').oninput = (e)=>{
+  renderGlossary(e.target.value);
+  if(e.target.value.trim()){
+    document.getElementById('glossaryList').classList.remove('collapsed');
+    document.getElementById('glossaryArrow').classList.add('open');
+  }
+};
 renderGlossary('');
+document.getElementById('glossaryToggle').onclick = ()=>{
+  document.getElementById('glossaryList').classList.toggle('collapsed');
+  document.getElementById('glossaryArrow').classList.toggle('open');
+};
 
 function safeUrl(u){
   if(!u) return '#';
