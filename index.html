@@ -73,6 +73,7 @@ header.top{margin-bottom:28px;position:relative;}
 
 /* tabs */
 .tabnav{display:flex;border-bottom:1px solid var(--line);margin-bottom:26px;}
+.tabbtn-glossary{margin-left:auto;margin-right:0;}
 .tabbtn{background:transparent;border:none;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:12.5px;letter-spacing:.04em;padding:11px 4px;margin-right:26px;cursor:pointer;position:relative;top:1px;border-bottom:2px solid transparent;transition:.15s;}
 .tabbtn:hover{color:var(--text);}
 .tabbtn.active{color:var(--amber);border-bottom-color:transparent;}
@@ -198,14 +199,9 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .empty{grid-column:1/-1;text-align:center;padding:70px 20px;color:var(--text-muted);}
 
 /* glossary */
-.glossary{margin-top:60px;padding-top:36px;border-top:1px solid var(--line);}
-.glossary-head{background:none;border:none;text-align:left;padding:0;cursor:pointer;width:100%;display:block;color:var(--text);}
-.glossary-head h2{font-family:'Fraunces',serif;font-weight:500;font-size:26px;margin:6px 0 8px;display:flex;align-items:center;gap:10px;}
-.glossary-arrow{font-size:16px;color:var(--gold);transition:transform .2s ease;display:inline-block;}
-.glossary-arrow.open{transform:rotate(180deg);}
+.glossary-head-static h2{font-family:'Fraunces',serif;font-weight:500;font-size:26px;margin:6px 0 8px;color:var(--text);}
 .glossary-search{width:100%;max-width:340px;margin:18px 0 22px;}
 .glossary-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px 28px;}
-.glossary-list.collapsed{display:none;}
 .gterm{border-bottom:1px solid var(--line);padding-bottom:14px;}
 .gterm-name{font-family:'Fraunces',serif;font-weight:600;font-size:15.5px;color:var(--text);margin-bottom:4px;}
 .gterm-def{font-size:13px;color:var(--text-muted);line-height:1.5;}
@@ -302,6 +298,7 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
   <div class="tabnav" id="tabnav">
     <button class="tabbtn" data-tab="collection" id="tabBtnCollection">My Collection</button>
     <button class="tabbtn" data-tab="consider" id="tabBtnConsider">Under Consideration</button>
+    <button class="tabbtn tabbtn-glossary" data-tab="glossary" id="tabBtnGlossary">Glossary</button>
   </div>
 
   <div class="tab-panel" id="panel-collection">
@@ -340,16 +337,15 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
     <div class="grid" id="considerGrid"></div>
   </div>
 
-  <section class="glossary" id="glossarySection">
-    <button type="button" class="glossary-head" id="glossaryToggle">
-      <div>
-        <div class="eyebrow">For reference</div>
-        <h2>Scent Glossary <span class="glossary-arrow" id="glossaryArrow">▾</span></h2>
-      </div>
-    </button>
+  <div class="tab-panel hidden" id="panel-glossary">
+    <div class="glossary-head-static">
+      <div class="eyebrow">For reference</div>
+      <h2>Scent Glossary</h2>
+      <p class="subtitle">Concentrations, performance terms, note structure, families, and the industry language that shows up on every bottle and every review.</p>
+    </div>
     <input class="search glossary-search" id="glossarySearch" placeholder="Search a term…">
-    <div id="glossaryList" class="glossary-list collapsed"></div>
-  </section>
+    <div id="glossaryList" class="glossary-list"></div>
+  </div>
 </div>
 
 <div class="overlay hidden" id="compareOverlay">
@@ -1259,18 +1255,8 @@ function renderGlossary(filter){
     </div>
   `).join('');
 }
-document.getElementById('glossarySearch').oninput = (e)=>{
-  renderGlossary(e.target.value);
-  if(e.target.value.trim()){
-    document.getElementById('glossaryList').classList.remove('collapsed');
-    document.getElementById('glossaryArrow').classList.add('open');
-  }
-};
+document.getElementById('glossarySearch').oninput = (e)=>renderGlossary(e.target.value);
 renderGlossary('');
-document.getElementById('glossaryToggle').onclick = ()=>{
-  document.getElementById('glossaryList').classList.toggle('collapsed');
-  document.getElementById('glossaryArrow').classList.toggle('open');
-};
 
 function safeUrl(u){
   if(!u) return '#';
@@ -1477,13 +1463,16 @@ async function seedConsiderIfEmpty(skipCheck){
 function switchTab(tab){
   document.getElementById('panel-collection').classList.toggle('hidden', tab!=='collection');
   document.getElementById('panel-consider').classList.toggle('hidden', tab!=='consider');
+  document.getElementById('panel-glossary').classList.toggle('hidden', tab!=='glossary');
   document.getElementById('tabBtnCollection').classList.toggle('active', tab==='collection');
   document.getElementById('tabBtnConsider').classList.toggle('active', tab==='consider');
+  document.getElementById('tabBtnGlossary').classList.toggle('active', tab==='glossary');
   try{ FirestoreStore.set('ui-active-tab', tab, false); }catch(e){}
   if(tab==='collection') requestAnimationFrame(()=>collapseTagRow('tagbar', 2));
 }
 document.getElementById('tabBtnCollection').onclick = ()=>switchTab('collection');
 document.getElementById('tabBtnConsider').onclick = ()=>switchTab('consider');
+document.getElementById('tabBtnGlossary').onclick = ()=>switchTab('glossary');
 
 (async ()=>{
   const results = await Promise.allSettled([
