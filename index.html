@@ -117,7 +117,11 @@ header.top{margin-bottom:28px;position:relative;}
   .toolbar{flex-direction:column;align-items:stretch;}
   .toolbar .search{min-width:0;}
 }
-.search{flex:1;min-width:180px;background:var(--surface);border:1px solid var(--line);color:var(--text);padding:9px 12px;border-radius:2px;font-size:13px;}
+.search-wrap{position:relative;flex:1;min-width:180px;}
+.search{width:100%;background:var(--surface);border:1px solid var(--line);color:var(--text);padding:9px 34px 9px 12px;border-radius:2px;font-size:13px;box-sizing:border-box;}
+.search-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--text-muted);font-size:18px;line-height:1;cursor:pointer;padding:4px 6px;}
+.search-clear:hover{color:var(--amber);}
+.search-clear.hidden{display:none;}
 .search:focus{outline:1px solid var(--amber);}
 select.sort{background:var(--surface);border:1px solid var(--line);color:var(--text);padding:9px 10px;border-radius:2px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;}
 .btn{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.03em;padding:9px 16px;border-radius:2px;border:1px solid var(--amber);background:transparent;color:var(--amber);cursor:pointer;transition:.15s;white-space:nowrap;}
@@ -226,10 +230,9 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .slider-row span{font-family:'IBM Plex Mono',monospace;font-size:12px;width:20px;text-align:center;color:var(--amber);}
 .tagpick{display:flex;flex-wrap:wrap;gap:7px;position:relative;}
 .tagpick .tagchip{border-color:var(--line);}
-.tags-more-trigger{background:var(--surface-2);color:var(--gold);}
-.tags-more-popover{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:20;background:var(--surface);border:1px solid var(--gold);border-radius:4px;padding:10px;display:flex;flex-wrap:wrap;gap:6px;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4);}
-.tags-more-popover.hidden{display:none;}
-.tag-anchor{display:inline-block;}
+.tags-toggle-btn{display:block;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gold);background:transparent;border:1px solid var(--line);border-radius:20px;padding:5px 12px;cursor:pointer;transition:.15s;}
+.tags-toggle-btn:hover{border-color:var(--amber);color:var(--amber);}
+.tags-toggle-btn.done-state{background:var(--accent-gradient);color:#17120F;border-color:transparent;font-weight:600;}
 .newtag-row{display:none;gap:8px;margin-top:8px;}
 .newtag-row.show{display:flex;}
 .newtag-row input{flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--text);padding:6px 9px;border-radius:2px;font-size:12.5px;}
@@ -303,7 +306,10 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 
   <div class="tab-panel" id="panel-collection">
     <div class="toolbar">
-      <input class="search" id="search" placeholder="Search by name or brand…">
+      <div class="search-wrap">
+        <input class="search" id="search" placeholder="Search by name or brand…">
+        <button type="button" class="search-clear hidden" id="searchClear" aria-label="Clear search">&times;</button>
+      </div>
       <select class="sort" id="sortSel">
         <option value="rating">Sort: highest rated</option>
         <option value="new">Sort: newest first</option>
@@ -326,7 +332,10 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
   <div class="tab-panel hidden" id="panel-consider">
     <p class="subtitle" style="margin-bottom:18px;">Perfumes you're eyeing, with your reasoning and the links you found, so you're not re-researching the same bottle twice.</p>
     <div class="toolbar">
-      <input class="search" id="c_search" placeholder="Search by name or brand…">
+      <div class="search-wrap">
+        <input class="search" id="c_search" placeholder="Search by name or brand…">
+        <button type="button" class="search-clear hidden" id="c_searchClear" aria-label="Clear search">&times;</button>
+      </div>
       <button class="btn primary" id="addConsiderBtn">+ Add to consideration</button>
       <button class="btn" id="c_compareToggleBtn">Compare</button>
     </div>
@@ -343,7 +352,10 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
       <h2>Scent Glossary</h2>
       <p class="subtitle">Concentrations, performance terms, note structure, families, and the industry language that shows up on every bottle and every review.</p>
     </div>
-    <input class="search glossary-search" id="glossarySearch" placeholder="Search a term…">
+    <div class="search-wrap glossary-search">
+      <input class="search" id="glossarySearch" placeholder="Search a term…">
+      <button type="button" class="search-clear hidden" id="glossarySearchClear" aria-label="Clear search">&times;</button>
+    </div>
     <div id="glossaryList" class="glossary-list"></div>
   </div>
 </div>
@@ -646,58 +658,47 @@ document.getElementById('saveProfile').onclick = async ()=>{
 
 function collapseTagRow(containerId, maxLines){
   const container = document.getElementById(containerId);
-  if(!container || container.offsetParent === null) return; // hidden right now — will be re-run when it becomes visible
-  // undo any previous collapse pass first (put popover chips back, remove trigger) so we measure fresh
-  const prevAnchor = container.querySelector('.tag-anchor');
-  if(prevAnchor){
-    const popover = prevAnchor.querySelector('.tags-more-popover');
-    if(popover){ while(popover.firstChild) container.insertBefore(popover.firstChild, prevAnchor); }
-    prevAnchor.remove();
-  }
+  if(!container) return;
+  const toggleId = containerId + '-tags-toggle';
+  const oldToggle = document.getElementById(toggleId);
+  if(oldToggle) oldToggle.remove();
+  container.style.maxHeight = '';
+  container.classList.remove('tags-capped');
+  if(container.offsetParent === null) return; // hidden right now — will be re-run when it becomes visible
+  const containerTop = container.getBoundingClientRect().top;
   const chips = Array.from(container.children);
   if(chips.length === 0) return;
-  const rows = [];
+  const rowTops = [];
   chips.forEach(chip=>{
-    const top = chip.offsetTop;
-    let row = rows.find(r=>Math.abs(r.top-top)<2);
-    if(!row){ row = {top, chips:[]}; rows.push(row); }
-    row.chips.push(chip);
+    const top = Math.round(chip.getBoundingClientRect().top - containerTop);
+    if(!rowTops.some(t=>Math.abs(t-top)<2)) rowTops.push(top);
   });
-  if(rows.length <= maxLines) return;
-  const hiddenChips = rows.slice(maxLines).flatMap(r=>r.chips);
-  hiddenChips.forEach(c=>c.remove());
+  rowTops.sort((a,b)=>a-b);
+  if(rowTops.length <= maxLines) return;
+  const capTop = rowTops[maxLines];
+  container.style.maxHeight = capTop + 'px';
+  container.classList.add('tags-capped');
 
-  const anchor = document.createElement('span');
-  anchor.className = 'tag-anchor';
-  const trigger = document.createElement('button');
-  trigger.type = 'button';
-  trigger.className = 'tagchip tags-more-trigger';
-  trigger.textContent = `⋯ ${hiddenChips.length} more`;
-  const popover = document.createElement('div');
-  popover.className = 'tags-more-popover hidden';
-  hiddenChips.forEach(c=>popover.appendChild(c));
-  anchor.appendChild(trigger);
-  anchor.appendChild(popover);
-  container.appendChild(anchor);
-
-  trigger.onclick = (ev)=>{
-    ev.stopPropagation();
-    popover.classList.toggle('hidden');
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.id = toggleId;
+  toggle.className = 'tags-toggle-btn';
+  toggle.textContent = `⋯ Show all ${chips.length} tags`;
+  toggle.onclick = ()=>{
+    if(container.classList.contains('tags-capped')){
+      container.style.maxHeight = 'none';
+      container.classList.remove('tags-capped');
+      toggle.textContent = 'Done ✓';
+      toggle.classList.add('done-state');
+    } else {
+      container.style.maxHeight = capTop + 'px';
+      container.classList.add('tags-capped');
+      toggle.textContent = `⋯ Show all ${chips.length} tags`;
+      toggle.classList.remove('done-state');
+    }
   };
+  container.insertAdjacentElement('afterend', toggle);
 }
-let _tagPopoverListenerBound = false;
-function ensureTagPopoverOutsideClick(){
-  if(_tagPopoverListenerBound) return;
-  _tagPopoverListenerBound = true;
-  document.addEventListener('click', (ev)=>{
-    document.querySelectorAll('.tags-more-popover').forEach(pop=>{
-      if(pop.classList.contains('hidden')) return;
-      const anchor = pop.closest('.tag-anchor');
-      if(anchor && !anchor.contains(ev.target)) pop.classList.add('hidden');
-    });
-  });
-}
-ensureTagPopoverOutsideClick();
 function buildTagbar(){
   const bar = document.getElementById('tagbar');
   bar.innerHTML = getAllTags().map(t=>`<button class="tagchip" data-tag="${t}">${t}</button>`).join('');
@@ -852,7 +853,20 @@ document.getElementById('closeCompare').onclick = ()=>{
   document.getElementById('compareOverlay').classList.add('hidden');
 };
 
-document.getElementById('search').oninput = render;
+function wireSearchClear(inputId, clearBtnId, onChange){
+  const input = document.getElementById(inputId);
+  const btn = document.getElementById(clearBtnId);
+  function updateVisibility(){ btn.classList.toggle('hidden', !input.value); }
+  input.addEventListener('input', ()=>{ onChange(); updateVisibility(); });
+  btn.onclick = ()=>{
+    input.value = '';
+    onChange();
+    updateVisibility();
+    input.focus();
+  };
+  updateVisibility();
+}
+wireSearchClear('search', 'searchClear', render);
 document.getElementById('sortSel').onchange = ()=>{
   render();
   try{ FirestoreStore.set('ui-sort', document.getElementById('sortSel').value, false); }catch(e){}
@@ -909,7 +923,6 @@ function buildTagpick(selected, containerId){
         row.classList.toggle('show');
         if(row.classList.contains('show')){
           document.getElementById(inputId).focus();
-          el.querySelectorAll('.tags-more-popover').forEach(p=>p.classList.add('hidden'));
         }
       }
     };
@@ -1255,7 +1268,7 @@ function renderGlossary(filter){
     </div>
   `).join('');
 }
-document.getElementById('glossarySearch').oninput = (e)=>renderGlossary(e.target.value);
+wireSearchClear('glossarySearch', 'glossarySearchClear', ()=>renderGlossary(document.getElementById('glossarySearch').value));
 renderGlossary('');
 
 function safeUrl(u){
@@ -1397,7 +1410,7 @@ function openConsiderModal(id){
   requestAnimationFrame(()=>collapseTagRow('c_tagpick', 2));
 }
 document.getElementById('addConsiderBtn').onclick = ()=>openConsiderModal(null);
-document.getElementById('c_search').oninput = renderConsiderations;
+wireSearchClear('c_search', 'c_searchClear', renderConsiderations);
 document.getElementById('cancelConsiderModal').onclick = ()=>document.getElementById('considerOverlay').classList.add('hidden');
 
 document.getElementById('saveConsiderEntry').onclick = async ()=>{
