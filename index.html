@@ -131,7 +131,7 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .btn.ghost{border-color:var(--line);color:var(--text-muted);}
 .btn.ghost:hover{background:var(--surface-2);color:var(--text);}
 
-.tagbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:26px;position:relative;}
+.tagbar{display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px;margin-bottom:26px;position:relative;max-height:112px;overflow-y:auto;overflow-x:hidden;padding-right:2px;}
 .tagchip{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);color:var(--text-muted);cursor:pointer;background:transparent;transition:.15s;}
 .tagchip.active{color:#17120F;border-color:transparent;background:var(--accent-gradient);}
 .tagchip[data-tag="Oud"].active{background:var(--oud);color:#EFE7DA;}
@@ -228,12 +228,8 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
 .slider-row{display:flex;align-items:center;gap:10px;}
 .slider-row input[type=range]{flex:1;accent-color:var(--amber);}
 .slider-row span{font-family:'IBM Plex Mono',monospace;font-size:12px;width:20px;text-align:center;color:var(--amber);}
-.tagpick{display:flex;flex-wrap:wrap;gap:7px;position:relative;}
+.tagpick{display:flex;flex-wrap:wrap;align-content:flex-start;gap:7px;position:relative;max-height:112px;overflow-y:auto;overflow-x:hidden;padding-right:2px;}
 .tagpick .tagchip{border-color:var(--line);}
-.tags-capped{overflow:hidden;}
-.tags-toggle-btn{display:block;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gold);background:transparent;border:1px solid var(--line);border-radius:20px;padding:5px 12px;cursor:pointer;transition:.15s;}
-.tags-toggle-btn:hover{border-color:var(--amber);color:var(--amber);}
-.tags-toggle-btn.done-state{background:var(--accent-gradient);color:#17120F;border-color:transparent;font-weight:600;}
 .newtag-row{display:none;gap:8px;margin-top:8px;}
 .newtag-row.show{display:flex;}
 .newtag-row input{flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--text);padding:6px 9px;border-radius:2px;font-size:12.5px;}
@@ -657,49 +653,6 @@ document.getElementById('saveProfile').onclick = async ()=>{
   btn.textContent = 'Saved ✓'; setTimeout(()=>btn.textContent='Save profile',1200);
 };
 
-function collapseTagRow(containerId, maxLines){
-  const container = document.getElementById(containerId);
-  if(!container) return;
-  const toggleId = containerId + '-tags-toggle';
-  const oldToggle = document.getElementById(toggleId);
-  if(oldToggle) oldToggle.remove();
-  container.style.maxHeight = '';
-  container.classList.remove('tags-capped');
-  if(container.offsetParent === null) return; // hidden right now — will be re-run when it becomes visible
-  const containerTop = container.getBoundingClientRect().top;
-  const chips = Array.from(container.children);
-  if(chips.length === 0) return;
-  const rowTops = [];
-  chips.forEach(chip=>{
-    const top = Math.round(chip.getBoundingClientRect().top - containerTop);
-    if(!rowTops.some(t=>Math.abs(t-top)<2)) rowTops.push(top);
-  });
-  rowTops.sort((a,b)=>a-b);
-  if(rowTops.length <= maxLines) return;
-  const capTop = rowTops[maxLines];
-  container.style.maxHeight = capTop + 'px';
-  container.classList.add('tags-capped');
-
-  const toggle = document.createElement('button');
-  toggle.type = 'button';
-  toggle.id = toggleId;
-  toggle.className = 'tags-toggle-btn';
-  toggle.textContent = `⋯ Show all ${chips.length} tags`;
-  toggle.onclick = ()=>{
-    if(container.classList.contains('tags-capped')){
-      container.style.maxHeight = 'none';
-      container.classList.remove('tags-capped');
-      toggle.textContent = 'Done ✓';
-      toggle.classList.add('done-state');
-    } else {
-      container.style.maxHeight = capTop + 'px';
-      container.classList.add('tags-capped');
-      toggle.textContent = `⋯ Show all ${chips.length} tags`;
-      toggle.classList.remove('done-state');
-    }
-  };
-  container.insertAdjacentElement('afterend', toggle);
-}
 function buildTagbar(){
   const bar = document.getElementById('tagbar');
   bar.innerHTML = getAllTags().map(t=>`<button class="tagchip" data-tag="${t}">${t}</button>`).join('');
@@ -711,7 +664,6 @@ function buildTagbar(){
       render();
     };
   });
-  collapseTagRow('tagbar', 2);
 }
 
 const STAR_PATH = "M12 1.5 15.09 8.26 22.5 9.27 17.25 14.14 18.68 21.75 12 18.02 5.32 21.75 6.75 14.14 1.5 9.27 8.91 8.26 Z";
@@ -937,7 +889,6 @@ async function handleNewTagAdd(containerId){
   const currentlySelected = getPickedTags(containerId).filter(t=>t!==OTHER_TAG);
   await addCustomTag(name);
   buildTagpick([...currentlySelected, name], containerId);
-  requestAnimationFrame(()=>collapseTagRow(containerId, 2));
   buildTagbar();
 }
 document.getElementById('newtag_add').onclick = ()=>handleNewTagAdd('tagpick');
@@ -1017,7 +968,6 @@ function openModal(id){
   else { prev.style.display='none'; prev.src=''; }
   buildTagpick(e?.tags || []);
   document.getElementById('overlay').classList.remove('hidden');
-  requestAnimationFrame(()=>collapseTagRow('tagpick', 2));
 }
 document.getElementById('addBtn').onclick = ()=>openModal(null);
 document.getElementById('cancelModal').onclick = ()=>{
@@ -1051,7 +1001,6 @@ function openMoveToCollectionModal(considerId){
   else { prev.style.display='none'; prev.src=''; }
   buildTagpick(c.tags || []);
   document.getElementById('overlay').classList.remove('hidden');
-  requestAnimationFrame(()=>collapseTagRow('tagpick', 2));
 }
 
 document.getElementById('saveEntry').onclick = async ()=>{
@@ -1408,7 +1357,6 @@ function openConsiderModal(id){
   else { cprev.style.display='none'; cprev.src=''; }
   buildTagpick(e?.tags || [], 'c_tagpick');
   document.getElementById('considerOverlay').classList.remove('hidden');
-  requestAnimationFrame(()=>collapseTagRow('c_tagpick', 2));
 }
 document.getElementById('addConsiderBtn').onclick = ()=>openConsiderModal(null);
 wireSearchClear('c_search', 'c_searchClear', renderConsiderations);
@@ -1482,7 +1430,6 @@ function switchTab(tab){
   document.getElementById('tabBtnConsider').classList.toggle('active', tab==='consider');
   document.getElementById('tabBtnGlossary').classList.toggle('active', tab==='glossary');
   try{ FirestoreStore.set('ui-active-tab', tab, false); }catch(e){}
-  if(tab==='collection') requestAnimationFrame(()=>collapseTagRow('tagbar', 2));
 }
 document.getElementById('tabBtnCollection').onclick = ()=>switchTab('collection');
 document.getElementById('tabBtnConsider').onclick = ()=>switchTab('consider');
