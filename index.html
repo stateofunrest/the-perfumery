@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!-- redeploy trigger: forcing a fresh build after a stuck GitHub Pages deployment -->
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
@@ -119,13 +118,38 @@ header.top{margin-bottom:28px;position:relative;}
   .toolbar .search{min-width:0;}
 }
 .search-wrap{position:relative;flex:1;min-width:180px;}
-.search{width:100%;background:var(--surface);border:1px solid var(--line);color:var(--text);padding:9px 34px 9px 12px;border-radius:2px;font-size:13px;box-sizing:border-box;}
+.search{width:100%;height:38px;box-sizing:border-box;background:var(--surface);border:1px solid var(--line);color:var(--text);padding:0 34px 0 12px;line-height:36px;border-radius:2px;font-size:13px;}
 .search-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--text-muted);font-size:18px;line-height:1;cursor:pointer;padding:4px 6px;}
 .search-clear:hover{color:var(--amber);}
 .search-clear.hidden{display:none;}
 .search:focus{outline:1px solid var(--amber);}
-select.sort{background:var(--surface);border:1px solid var(--line);color:var(--text);padding:9px 10px;border-radius:2px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;}
-.btn{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.03em;padding:9px 16px;border-radius:2px;border:1px solid var(--amber);background:transparent;color:var(--amber);cursor:pointer;transition:.15s;white-space:nowrap;}
+select.sort{
+  height:38px;
+  box-sizing:border-box;
+  -webkit-appearance:none;-moz-appearance:none;appearance:none;
+  background-color:var(--surface);
+  border:1px solid var(--line);
+  color:var(--text);
+  padding:0 30px 0 10px;
+  line-height:36px;
+  border-radius:2px;
+  font-size:12.5px;
+  font-family:'IBM Plex Mono',monospace;
+  cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23EFE7DA' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 10px center;
+  background-size:10px 6px;
+}
+html[data-theme="light"] select.sort{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23241E17' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: light){
+  html[data-theme="system"] select.sort{
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23241E17' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+}
+.btn{height:38px;box-sizing:border-box;line-height:36px;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.03em;padding:0 16px;border-radius:2px;border:1px solid var(--amber);background:transparent;color:var(--amber);cursor:pointer;transition:.15s;white-space:nowrap;}
 .btn:hover{background:var(--accent-gradient);color:#17120F;border-color:transparent;}
 .btn.ghost{border-color:var(--line);color:var(--text-muted);}
 .btn.ghost:hover{background:var(--surface-2);color:var(--text);}
@@ -364,7 +388,8 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
         <option value="new">Sort: newest first</option>
         <option value="old">Sort: oldest first</option>
         <option value="az">Sort: A–Z</option>
-        <option value="price">Sort: price</option>
+        <option value="price_low">Sort: price (low to high)</option>
+        <option value="price_high">Sort: price (high to low)</option>
       </select>
       <button class="btn primary" id="addBtn"><span>+ Add perfume</span></button>
       <button class="btn" id="compareToggleBtn">Compare</button>
@@ -385,6 +410,13 @@ select.sort{background:var(--surface);border:1px solid var(--line);color:var(--t
         <input class="search" id="c_search" placeholder="Search by name or brand…">
         <button type="button" class="search-clear hidden" id="c_searchClear" aria-label="Clear search">&times;</button>
       </div>
+      <select class="sort" id="c_sortSel">
+        <option value="new">Sort: newest first</option>
+        <option value="old">Sort: oldest first</option>
+        <option value="az">Sort: A–Z</option>
+        <option value="price_low">Sort: price (low to high)</option>
+        <option value="price_high">Sort: price (high to low)</option>
+      </select>
       <button class="btn primary" id="addConsiderBtn"><span>+ Add to consideration</span></button>
       <button class="btn" id="c_compareToggleBtn">Compare</button>
     </div>
@@ -755,7 +787,8 @@ function render(){
   else if(sort==='new') list.sort((a,b)=>b.no-a.no);
   else if(sort==='old') list.sort((a,b)=>a.no-b.no);
   else if(sort==='az') list.sort((a,b)=>(a.brand+a.name).localeCompare(b.brand+b.name));
-  else if(sort==='price') list.sort((a,b)=>(parseFloat((a.price||'0').replace(/[^0-9.]/g,''))||0)-(parseFloat((b.price||'0').replace(/[^0-9.]/g,''))||0));
+  else if(sort==='price_low') list.sort((a,b)=>(parseFloat((a.price||'0').replace(/[^0-9.]/g,''))||0)-(parseFloat((b.price||'0').replace(/[^0-9.]/g,''))||0));
+  else if(sort==='price_high') list.sort((a,b)=>(parseFloat((b.price||'0').replace(/[^0-9.]/g,''))||0)-(parseFloat((a.price||'0').replace(/[^0-9.]/g,''))||0));
 
   if(list.length===0){
     grid.innerHTML = `<div class="empty"><h3>Nothing here yet</h3><p>Add the first bottle to start the record.</p></div>`;
@@ -875,6 +908,10 @@ wireSearchClear('search', 'searchClear', render);
 document.getElementById('sortSel').onchange = ()=>{
   render();
   try{ FirestoreStore.set('ui-sort', document.getElementById('sortSel').value, false); }catch(e){}
+};
+document.getElementById('c_sortSel').onchange = ()=>{
+  renderConsiderations();
+  try{ FirestoreStore.set('ui-sort-consider', document.getElementById('c_sortSel').value, false); }catch(e){}
 };
 function applyTheme(choice){
   document.documentElement.setAttribute('data-theme', choice);
@@ -1295,11 +1332,17 @@ let considerCompareSelected = [];
 function renderConsiderations(){
   const grid = document.getElementById('considerGrid');
   const q = (document.getElementById('c_search').value || '').trim().toLowerCase();
+  const sort = document.getElementById('c_sortSel').value;
   if(considerations.entries.length===0){
     grid.innerHTML = `<div class="empty"><h3>Nothing on the list yet</h3><p>Add a perfume you're eyeing before you buy it.</p></div>`;
     return;
   }
-  let list = [...considerations.entries].sort((a,b)=>b.no-a.no);
+  let list = [...considerations.entries];
+  if(sort==='old') list.sort((a,b)=>a.no-b.no);
+  else if(sort==='az') list.sort((a,b)=>(a.brand+a.name).localeCompare(b.brand+b.name));
+  else if(sort==='price_low') list.sort((a,b)=>(parseFloat((a.lowestPrice||'0').replace(/[^0-9.]/g,''))||0)-(parseFloat((b.lowestPrice||'0').replace(/[^0-9.]/g,''))||0));
+  else if(sort==='price_high') list.sort((a,b)=>(parseFloat((b.lowestPrice||'0').replace(/[^0-9.]/g,''))||0)-(parseFloat((a.lowestPrice||'0').replace(/[^0-9.]/g,''))||0));
+  else list.sort((a,b)=>b.no-a.no); // 'new' (default)
   if(q) list = list.filter(e=>(e.brand+' '+e.name).toLowerCase().includes(q));
   if(list.length===0){
     grid.innerHTML = `<div class="empty"><h3>No matches</h3><p>Nothing in your list matches that search.</p></div>`;
@@ -1496,11 +1539,12 @@ document.getElementById('tabBtnGlossary').onclick = ()=>switchTab('glossary');
     FirestoreStore.get('profile-data', false),
     FirestoreStore.get('custom-tags', false),
     FirestoreStore.get('ui-sort', false),
+    FirestoreStore.get('ui-sort-consider', false),
     FirestoreStore.get('consider-meta', false),
     FirestoreStore.listWithData('consider:', false),
     FirestoreStore.get('ui-active-tab', false),
   ]);
-  const [themeRes, oldDataRes, vaultMetaRes, entriesRes, profileRes, tagsRes, sortRes, considerMetaRes, considerListRes, tabRes] = results;
+  const [themeRes, oldDataRes, vaultMetaRes, entriesRes, profileRes, tagsRes, sortRes, considerSortRes, considerMetaRes, considerListRes, tabRes] = results;
   const val = (r)=> (r.status==='fulfilled' && r.value && r.value.value) ? r.value.value : null;
 
   applyTheme(val(themeRes) || 'dark');
@@ -1529,7 +1573,9 @@ document.getElementById('tabBtnGlossary').onclick = ()=>switchTab('glossary');
   const tagsVal = val(tagsRes);
   try{ customTags = tagsVal ? JSON.parse(tagsVal) : []; }catch(e){ customTags = []; }
   const sortVal = val(sortRes);
-  if(sortVal) document.getElementById('sortSel').value = sortVal;
+  if(sortVal) document.getElementById('sortSel').value = (sortVal==='price' ? 'price_low' : sortVal);
+  const considerSortVal = val(considerSortRes);
+  if(considerSortVal) document.getElementById('c_sortSel').value = considerSortVal;
 
   if(!migrated && vault.entries.length === 0){
     await seedIfEmpty(true);
