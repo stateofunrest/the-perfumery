@@ -155,10 +155,13 @@ html[data-theme="light"] select.sort{
 .btn.ghost:hover{background:var(--surface-2);color:var(--text);}
 
 /* Default hover treatment for gradient-filled action buttons: a grey (#A3A3A3) panel
-   slides in from the right on hover (covering the button), and slides back out to the
-   right on click, revealing the green-grey gradient again.
-   The label text is wrapped in a <span> (position:relative) so it reliably paints above
-   the sliding overlay regardless of z-index/stacking quirks in any given renderer. */
+   slides in on hover along the same diagonal as the button's own 135deg gradient
+   (top-left → bottom-right), and slides back out along that same diagonal on click,
+   revealing the gradient again. The overlay sits inside the button's padding box
+   (not its border box), so a thin 1px sliver of the gradient stays visible as a
+   border all the way around, even while the grey is covering the button.
+   The label text is wrapped in a <span> (position:relative) so it reliably paints
+   above the sliding overlay regardless of z-index/stacking quirks in any given renderer. */
 .btn.primary,
 .newtag-row button{
   position:relative;
@@ -173,16 +176,16 @@ html[data-theme="light"] select.sort{
   position:absolute;
   top:0;right:0;bottom:0;left:0;
   background:#A3A3A3;
-  transform:translateX(100%);
+  transform:translate(100%,100%);
   transition:transform .35s ease;
 }
 .btn.primary:hover::before,
 .newtag-row button:hover::before{
-  transform:translateX(0);
+  transform:translate(0,0);
 }
 .btn.primary:active::before,
 .newtag-row button:active::before{
-  transform:translateX(100%);
+  transform:translate(100%,100%);
   transition:transform .2s ease;
 }
 .btn.primary > span,
