@@ -669,6 +669,16 @@ let pendingPhoto = null;
 let pendingConsiderPhoto = null;
 let movingFromConsiderId = null;
 
+// Computes the next serial number directly from the entries actually present, rather
+// than trusting a separately-stored counter. A separately-stored counter can drift out
+// of sync with reality (e.g. if it's ever reset by a bug) and silently hand out numbers
+// that collide with entries that already exist — self-healing avoids that entirely.
+function nextEntryNo(entries){
+  let max = 0;
+  for(const e of entries){ if(typeof e.no === 'number' && e.no > max) max = e.no; }
+  return max + 1;
+}
+
 function svgBottle(){
   return '<svg viewBox="0 0 24 24" fill="none" stroke="#A5978A" stroke-width="1.2"><path d="M9 2h6M10 2v3.2c0 .5-.2.9-.5 1.3L8 8.5c-.5.6-.8 1.4-.8 2.2V20a2 2 0 0 0 2 2h5.6a2 2 0 0 0 2-2v-9.3c0-.8-.3-1.6-.8-2.2l-1.5-2c-.3-.4-.5-.8-.5-1.3V2"/></svg>';
 }
@@ -1118,7 +1128,7 @@ document.getElementById('saveEntry').onclick = async ()=>{
     vault.entries[idx] = {...vault.entries[idx], ...data};
     await saveEntryToStorage(vault.entries[idx]);
   } else {
-    const newEntry = {id:'p'+Date.now(), no: vault.nextNo++, ...data};
+    const newEntry = {id:'p'+Date.now(), no: nextEntryNo(vault.entries), ...data};
     vault.entries.push(newEntry);
     await saveEntryToStorage(newEntry);
     await saveMeta();
@@ -1476,7 +1486,7 @@ document.getElementById('saveConsiderEntry').onclick = async ()=>{
     considerations.entries[idx] = {...considerations.entries[idx], ...data};
     await saveConsiderEntryToStorage(considerations.entries[idx]);
   } else {
-    const newEntry = {id:'c'+Date.now(), no: considerations.nextNo++, ...data};
+    const newEntry = {id:'c'+Date.now(), no: nextEntryNo(considerations.entries), ...data};
     considerations.entries.push(newEntry);
     await saveConsiderEntryToStorage(newEntry);
     await saveConsiderMeta();
@@ -1607,6 +1617,26 @@ function showLoadError(what, reason){
   renderConsiderations();
 
   switchTab(val(tabRes) || 'consider');
+
+  // TEMPORARY one-time repair tool, added to fix accession numbers left duplicated/gapped
+  // by an earlier bug (a corrupted counter caused new entries to occasionally collide with
+  // existing numbers). Run once from the browser console with: await __renumberAll()
+  // Safe: only rewrites the "no" (accession number) field on each entry, in their current
+  // relative order, closing gaps and resolving duplicates. Nothing else is touched. Remove
+  // this block once you've run it and confirmed the numbering looks right.
+  window.__renumberAll = async function(){
+    if(!confirm('This will renumber every entry in both My Collection and Under Consideration, in their current order, to close any gaps/duplicates. Continue?')) return;
+    const sortedVault = [...vault.entries].sort((a,b)=>(a.no||0)-(b.no||0));
+    let n = 1;
+    for(const e of sortedVault){ e.no = n++; await saveEntryToStorage(e); }
+    const sortedConsider = [...considerations.entries].sort((a,b)=>(a.no||0)-(b.no||0));
+    let cn = 1;
+    for(const e of sortedConsider){ e.no = cn++; await saveConsiderEntryToStorage(e); }
+    render();
+    renderConsiderations();
+    console.log('Renumbering complete: ' + sortedVault.length + ' collection entries, ' + sortedConsider.length + ' consideration entries.');
+    alert('Done. Collection and Under Consideration have been renumbered with no gaps or duplicates.');
+  };
 })();
 </script>
 </body>
