@@ -317,10 +317,14 @@ html[data-theme="light"] select.sort{
 .photo-preview{width:64px;height:64px;border-radius:2px;background:var(--surface-2);border:1px solid var(--line);object-fit:cover;flex-shrink:0;}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px;}
 .loading{text-align:center;padding:60px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;font-size:13px;}
+.load-error-banner{background:#4A1F1A;border-bottom:2px solid #C25A4A;color:#F5D9D3;font-family:'IBM Plex Mono',monospace;font-size:12.5px;line-height:1.5;padding:12px 20px;}
+.load-error-banner.hidden{display:none;}
+.load-error-banner b{color:#fff;}
 ::placeholder{color:#6e6255;}
 </style>
 </head>
 <body>
+<div id="loadErrorBanner" class="load-error-banner hidden"></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
     <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -1138,13 +1142,7 @@ async function removeEntry(id){
   render();
 }
 
-async function seedIfEmpty(skipCheck){
-  if(!skipCheck){
-    try{
-      const listRes = await FirestoreStore.list('entry:', false);
-      if(listRes && listRes.keys && listRes.keys.length>0) return;
-    }catch(e){ /* no entries yet, proceed to seed */ }
-  }
+async function seedIfEmpty(){
   vault = {
     nextNo: 12,
     entries: [
@@ -1494,13 +1492,7 @@ async function removeConsiderEntry(id){
   renderConsiderations();
 }
 
-async function seedConsiderIfEmpty(skipCheck){
-  if(!skipCheck){
-    try{
-      const listRes = await FirestoreStore.list('consider:', false);
-      if(listRes && listRes.keys && listRes.keys.length>0) return;
-    }catch(e){ /* proceed to seed */ }
-  }
+async function seedConsiderIfEmpty(){
   const seedList = [
     {id:'c1',no:1,brand:'Rayhaan',name:'Pacific Aura',tags:['Fresh'],verdict:'Considering',
       notes:`Fits the fresh / gym / summer slot. Fresh-citrus-mint opening, amber-fig-ambroxan base. Reviews are mixed on longevity (4-5 hrs to all-day depending on skin and batch), and it's widely noted as a dupe of LV Pacific Chill — near-identical to a few other clones. Competent, but not distinctive.`,
@@ -1530,6 +1522,13 @@ document.getElementById('tabBtnCollection').onclick = ()=>switchTab('collection'
 document.getElementById('tabBtnConsider').onclick = ()=>switchTab('consider');
 document.getElementById('tabBtnGlossary').onclick = ()=>switchTab('glossary');
 
+function showLoadError(what, reason){
+  const banner = document.getElementById('loadErrorBanner');
+  const msg = (reason && reason.message) ? reason.message : String(reason || 'unknown error');
+  banner.innerHTML += (banner.innerHTML ? '<br>' : '') +
+    `<b>Couldn't load your ${what} from the database.</b> Showing nothing rather than replacing it with demo data, so nothing you've saved is at risk. Error: ${msg.replace(/</g,'&lt;')}`;
+  banner.classList.remove('hidden');
+}
 (async ()=>{
   const results = await Promise.allSettled([
     FirestoreStore.get('ui-theme', false),
@@ -1552,6 +1551,7 @@ document.getElementById('tabBtnGlossary').onclick = ()=>switchTab('glossary');
   vault = { entries: [], nextNo: 1 };
   const metaVal = val(vaultMetaRes);
   if(metaVal){ try{ vault.nextNo = JSON.parse(metaVal).nextNo || 1; }catch(e){} }
+  const entriesFetchFailed = entriesRes.status === 'rejected';
   const entryDocs = (entriesRes.status==='fulfilled' && entriesRes.value && entriesRes.value.docs) || [];
   for(const d of entryDocs){ try{ if(d.value) vault.entries.push(JSON.parse(d.value)); }catch(e){} }
 
@@ -1578,7 +1578,11 @@ document.getElementById('tabBtnGlossary').onclick = ()=>switchTab('glossary');
   if(considerSortVal) document.getElementById('c_sortSel').value = considerSortVal;
 
   if(!migrated && vault.entries.length === 0){
-    await seedIfEmpty(true);
+    if(entriesFetchFailed){
+      showLoadError('collection', entriesRes.reason);
+    } else {
+      await seedIfEmpty();
+    }
   }
 
   fillProfileForm();
@@ -1590,10 +1594,15 @@ document.getElementById('tabBtnGlossary').onclick = ()=>switchTab('glossary');
   considerations = { entries: [], nextNo: 1 };
   const cMetaVal = val(considerMetaRes);
   if(cMetaVal){ try{ considerations.nextNo = JSON.parse(cMetaVal).nextNo || 1; }catch(e){} }
+  const considerFetchFailed = considerListRes.status === 'rejected';
   const considerDocs = (considerListRes.status==='fulfilled' && considerListRes.value && considerListRes.value.docs) || [];
   for(const d of considerDocs){ try{ if(d.value) considerations.entries.push(JSON.parse(d.value)); }catch(e){} }
   if(considerations.entries.length === 0){
-    await seedConsiderIfEmpty(true);
+    if(considerFetchFailed){
+      showLoadError('Under Consideration list', considerListRes.reason);
+    } else {
+      await seedConsiderIfEmpty();
+    }
   }
   renderConsiderations();
 
