@@ -673,9 +673,27 @@ let movingFromConsiderId = null;
 // than trusting a separately-stored counter. A separately-stored counter can drift out
 // of sync with reality (e.g. if it's ever reset by a bug) and silently hand out numbers
 // that collide with entries that already exist — self-healing avoids that entirely.
-function nextEntryNo(entries){
+// Computes the next serial number by checking Firestore directly, rather than trusting
+// this tab's in-memory copy of the data. Trusting in-memory state alone isn't safe: if
+// this tab has been open since before another change happened (a repair tool ran, an
+// entry was added from another tab/device, etc.), its picture of "what numbers already
+// exist" can be stale, and a new entry could get a colliding number even though the
+// underlying logic is otherwise correct. Checking live, right before assigning, closes
+// that gap. Falls back to the in-memory list only if the live check itself fails.
+async function nextEntryNo(prefix, inMemoryEntries){
   let max = 0;
-  for(const e of entries){ if(typeof e.no === 'number' && e.no > max) max = e.no; }
+  try{
+    const fresh = await FirestoreStore.listWithData(prefix, false);
+    const docs = (fresh && fresh.docs) || [];
+    for(const d of docs){
+      try{
+        const parsed = JSON.parse(d.value);
+        if(typeof parsed.no === 'number' && parsed.no > max) max = parsed.no;
+      }catch(e){}
+    }
+  }catch(e){
+    for(const en of inMemoryEntries){ if(typeof en.no === 'number' && en.no > max) max = en.no; }
+  }
   return max + 1;
 }
 
@@ -1128,7 +1146,7 @@ document.getElementById('saveEntry').onclick = async ()=>{
     vault.entries[idx] = {...vault.entries[idx], ...data};
     await saveEntryToStorage(vault.entries[idx]);
   } else {
-    const newEntry = {id:'p'+Date.now(), no: nextEntryNo(vault.entries), ...data};
+    const newEntry = {id:'p'+Date.now(), no: await nextEntryNo('entry:', vault.entries), ...data};
     vault.entries.push(newEntry);
     await saveEntryToStorage(newEntry);
     await saveMeta();
@@ -1486,7 +1504,7 @@ document.getElementById('saveConsiderEntry').onclick = async ()=>{
     considerations.entries[idx] = {...considerations.entries[idx], ...data};
     await saveConsiderEntryToStorage(considerations.entries[idx]);
   } else {
-    const newEntry = {id:'c'+Date.now(), no: nextEntryNo(considerations.entries), ...data};
+    const newEntry = {id:'c'+Date.now(), no: await nextEntryNo('consider:', considerations.entries), ...data};
     considerations.entries.push(newEntry);
     await saveConsiderEntryToStorage(newEntry);
     await saveConsiderMeta();
@@ -1618,24 +1636,52 @@ function showLoadError(what, reason){
 
   switchTab(val(tabRes) || 'consider');
 
-  // TEMPORARY one-time repair tool, added to fix accession numbers left duplicated/gapped
-  // by an earlier bug (a corrupted counter caused new entries to occasionally collide with
-  // existing numbers). Run once from the browser console with: await __renumberAll()
-  // Safe: only rewrites the "no" (accession number) field on each entry, in their current
-  // relative order, closing gaps and resolving duplicates. Nothing else is touched. Remove
-  // this block once you've run it and confirmed the numbering looks right.
-  window.__renumberAll = async function(){
-    if(!confirm('This will renumber every entry in both My Collection and Under Consideration, in their current order, to close any gaps/duplicates. Continue?')) return;
-    const sortedVault = [...vault.entries].sort((a,b)=>(a.no||0)-(b.no||0));
+  // TEMPORARY one-time repair tool. Run once from the browser console with:
+  //   await __cleanupAndRenumber()
+  // What it does, in order:
+  //  1) Fetches your entries directly from the database (not from what's currently on
+  //     screen — this matters, since a tab open for a while can have a stale picture).
+  //  2) Finds and removes any leftover demo/placeholder entries from an earlier bug
+  //     (they have fixed, known IDs — s1-s11 for Collection, c1-c3 for Under
+  //     Consideration — that can't collide with any of your real entries, which use a
+  //     timestamp-based ID). It shows you exactly what it's about to delete first.
+  //  3) Renumbers everything that's left, in both tabs, sequentially — closing any
+  //     gaps or duplicates.
+  //  4) Reloads the page so what you see matches what's actually in the database.
+  // Remove this block once you've run it and confirmed the site looks right.
+  window.__cleanupAndRenumber = async function(){
+    const seedCollectionIds = new Set(['s1','s2','s3','s4','s5','s6','s7','s8','s9','s10','s11']);
+    const seedConsiderIds = new Set(['c1','c2','c3']);
+
+    const freshEntriesRes = await FirestoreStore.listWithData('entry:', false);
+    const freshConsiderRes = await FirestoreStore.listWithData('consider:', false);
+
+    const allEntries = (freshEntriesRes.docs||[]).map(d=>{ try{ return JSON.parse(d.value); }catch(e){ return null; } }).filter(Boolean);
+    const allConsider = (freshConsiderRes.docs||[]).map(d=>{ try{ return JSON.parse(d.value); }catch(e){ return null; } }).filter(Boolean);
+
+    const bogusEntries = allEntries.filter(e=>seedCollectionIds.has(e.id));
+    const bogusConsider = allConsider.filter(e=>seedConsiderIds.has(e.id));
+    const summaryLines = [
+      ...bogusEntries.map(e=>`Collection: ${e.brand} — ${e.name}`),
+      ...bogusConsider.map(e=>`Under Consideration: ${e.brand} — ${e.name}`)
+    ];
+    const summary = summaryLines.length ? summaryLines.join('\n') : '(none found)';
+
+    if(!confirm(`This checks the database directly and will:\n\n1) Delete these leftover demo entries, if present:\n${summary}\n\n2) Renumber everything remaining in both tabs sequentially, closing any gaps/duplicates.\n\n3) Reload the page.\n\nContinue?`)) return;
+
+    for(const e of bogusEntries){ await deleteEntryFromStorage(e.id); }
+    for(const e of bogusConsider){ await deleteConsiderEntryFromStorage(e.id); }
+
+    const remainingEntries = allEntries.filter(e=>!seedCollectionIds.has(e.id)).sort((a,b)=>(a.no||0)-(b.no||0));
     let n = 1;
-    for(const e of sortedVault){ e.no = n++; await saveEntryToStorage(e); }
-    const sortedConsider = [...considerations.entries].sort((a,b)=>(a.no||0)-(b.no||0));
+    for(const e of remainingEntries){ e.no = n++; await saveEntryToStorage(e); }
+
+    const remainingConsider = allConsider.filter(e=>!seedConsiderIds.has(e.id)).sort((a,b)=>(a.no||0)-(b.no||0));
     let cn = 1;
-    for(const e of sortedConsider){ e.no = cn++; await saveConsiderEntryToStorage(e); }
-    render();
-    renderConsiderations();
-    console.log('Renumbering complete: ' + sortedVault.length + ' collection entries, ' + sortedConsider.length + ' consideration entries.');
-    alert('Done. Collection and Under Consideration have been renumbered with no gaps or duplicates.');
+    for(const e of remainingConsider){ e.no = cn++; await saveConsiderEntryToStorage(e); }
+
+    alert(`Done.\n\nRemoved ${bogusEntries.length} demo collection entr${bogusEntries.length===1?'y':'ies'} and ${bogusConsider.length} demo consideration entr${bogusConsider.length===1?'y':'ies'}.\nRenumbered ${remainingEntries.length} collection entries and ${remainingConsider.length} consideration entries.\n\nReloading now.`);
+    location.reload();
   };
 })();
 </script>
