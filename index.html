@@ -561,7 +561,7 @@ html[data-theme="light"] select.sort{
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, doc, getDoc, setDoc, deleteDoc,
-  collection, query, where, getDocs, documentId
+  collection, query, where, getDocs, documentId, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -673,28 +673,45 @@ let movingFromConsiderId = null;
 // than trusting a separately-stored counter. A separately-stored counter can drift out
 // of sync with reality (e.g. if it's ever reset by a bug) and silently hand out numbers
 // that collide with entries that already exist — self-healing avoids that entirely.
-// Computes the next serial number by checking Firestore directly, rather than trusting
-// this tab's in-memory copy of the data. Trusting in-memory state alone isn't safe: if
-// this tab has been open since before another change happened (a repair tool ran, an
-// entry was added from another tab/device, etc.), its picture of "what numbers already
-// exist" can be stale, and a new entry could get a colliding number even though the
-// underlying logic is otherwise correct. Checking live, right before assigning, closes
-// that gap. Falls back to the in-memory list only if the live check itself fails.
-async function nextEntryNo(prefix, inMemoryEntries){
-  let max = 0;
-  try{
-    const fresh = await FirestoreStore.listWithData(prefix, false);
-    const docs = (fresh && fresh.docs) || [];
-    for(const d of docs){
-      try{
-        const parsed = JSON.parse(d.value);
-        if(typeof parsed.no === 'number' && parsed.no > max) max = parsed.no;
-      }catch(e){}
-    }
-  }catch(e){
-    for(const en of inMemoryEntries){ if(typeof en.no === 'number' && en.no > max) max = en.no; }
+// Assigns the next serial number atomically, using a Firestore transaction, so two
+// near-simultaneous adds (e.g. moving several considerations to the collection one
+// right after another) can never compute the same "next" number and collide. This
+// replaces an earlier approach that read the current max and then wrote separately —
+// safer than trusting stale in-memory state, but still capable of two concurrent calls
+// both reading the same "current max" before either had written its new entry. A
+// transaction closes that gap: Firestore guarantees it atomically, retrying under the
+// hood if two calls land at the same instant, so only one of them can ever win a given
+// number.
+async function ensureCounterInitialized(counterKey, entriesPrefix){
+  const counterRef = doc(db, KV, counterKey);
+  const snap = await getDoc(counterRef);
+  if(!snap.exists()){
+    let max = 0;
+    try{
+      const existing = await FirestoreStore.listWithData(entriesPrefix, false);
+      for(const d of (existing.docs||[])){
+        try{
+          const parsed = JSON.parse(d.value);
+          if(typeof parsed.no === 'number' && parsed.no > max) max = parsed.no;
+        }catch(e){}
+      }
+    }catch(e){}
+    try{ await setDoc(counterRef, {value: JSON.stringify({count: max})}); }catch(e){}
   }
-  return max + 1;
+}
+async function nextEntryNo(counterKey, entriesPrefix){
+  await ensureCounterInitialized(counterKey, entriesPrefix);
+  const counterRef = doc(db, KV, counterKey);
+  return await runTransaction(db, async (tx)=>{
+    const snap = await tx.get(counterRef);
+    let current = 0;
+    if(snap.exists()){
+      try{ current = JSON.parse(snap.data().value).count || 0; }catch(e){}
+    }
+    const next = current + 1;
+    tx.set(counterRef, {value: JSON.stringify({count: next})});
+    return next;
+  });
 }
 
 function svgBottle(){
@@ -1146,7 +1163,7 @@ document.getElementById('saveEntry').onclick = async ()=>{
     vault.entries[idx] = {...vault.entries[idx], ...data};
     await saveEntryToStorage(vault.entries[idx]);
   } else {
-    const newEntry = {id:'p'+Date.now(), no: await nextEntryNo('entry:', vault.entries), ...data};
+    const newEntry = {id:'p'+Date.now(), no: await nextEntryNo('entry-counter', 'entry:'), ...data};
     vault.entries.push(newEntry);
     await saveEntryToStorage(newEntry);
     await saveMeta();
@@ -1168,37 +1185,6 @@ async function removeEntry(id){
   vault.entries = vault.entries.filter(e=>e.id!==id);
   await deleteEntryFromStorage(id);
   render();
-}
-
-async function seedIfEmpty(){
-  vault = {
-    nextNo: 12,
-    entries: [
-      {id:'s1',no:1,brand:'Zimaya',name:'Sharaf Blend',photo:null,tags:['Oud','Amber'],format:'EDP',price:'',overall:4.5,longevity:5,projection:5,quality:5,sting:false,notes:'Strong all-round performer — longevity, projection and scent quality all land well.'},
-      {id:'s2',no:2,brand:'Lattafa',name:'Ameer Al Oud Intense Oud',photo:null,tags:['Oud'],format:'EDP',price:'',overall:3,longevity:2,projection:2,quality:3,sting:false,notes:'Weak longevity and projection.'},
-      {id:'s3',no:3,brand:'Afnan',name:'Turathi Blue',photo:null,tags:['Fresh','Amber'],format:'EDP',price:'',overall:3.5,longevity:1,projection:1,quality:3,sting:false,notes:'Feels synthetic. No real longevity or projection.'},
-      {id:'s4',no:4,brand:'Khadlaj',name:'Island',photo:null,tags:['Fresh','Other'],format:'EDP',price:'',overall:4,longevity:4,projection:4,quality:4,sting:false,notes:'Very different scent profile from the rest of the collection — a plus, not a caveat.'},
-      {id:'s5',no:5,brand:'Rayhaan',name:'Wolf',photo:null,tags:['Other'],format:'EDP',price:'',overall:3.5,longevity:2,projection:2,quality:3,sting:false,notes:'Rated 3.5 specifically because of longevity — not a scent quality problem.'},
-      {id:'s6',no:6,brand:'Lattafa',name:'Teriaq Intense',photo:null,tags:['Oud','Amber'],format:'EDP',price:'',overall:4,longevity:4,projection:4,quality:4,sting:false,notes:'Consistently good across the board.'},
-      {id:'s7',no:7,brand:'Ahmad Al Maghribi',name:'Bin Shaikh',photo:null,tags:['Oud','Amber'],format:'EDP',price:'',overall:4.5,longevity:5,projection:5,quality:5,sting:false,notes:'Unique dry-down — a standout in the collection.'},
-      {id:'s8',no:8,brand:'Lattafa',name:'Raghba',photo:null,tags:['Sandalwood','Amber'],format:'EDP',price:'',overall:4,longevity:4,projection:4,quality:4,sting:false,notes:'Loves the sandalwood base specifically in this one — not a blanket sandalwood preference.'},
-      {id:'s9',no:9,brand:'Rasasi',name:'Hawas Kobra',photo:null,tags:['Other'],format:'EDP',price:'',overall:3.5,longevity:2,projection:2,quality:3,sting:false,notes:'Weak longevity and projection.'},
-      {id:'s10',no:10,brand:'Neesh',name:'Milky Way',photo:null,tags:['Gourmand'],format:'EDP',price:'',overall:2.5,longevity:3,projection:1,quality:2,sting:false,notes:'Very hyped but projection fades after an hour.'},
-      {id:'s11',no:11,brand:'Neesh',name:'Glazed Water',photo:null,tags:['Fresh','Gourmand'],format:'EDP',price:'',overall:2.5,longevity:2,projection:1,quality:2,sting:false,notes:'Forgettable.'},
-    ]
-  };
-  for(const entry of vault.entries){ await saveEntryToStorage(entry); }
-  await saveMeta();
-  profile = {
-    favorite:'Gourmand — sweet, intense, captivating',
-    also:'Oud, Amber, Vetiver, Sandalwood',
-    variety:'Fresh / summer scents (watermelon, pineapple, iris) for gym wear — subtle but intentional',
-    format:'EDP / Extrait / Parfum',
-    budget:'₹2,000 – ₹5,000',
-    dealbreakers:'Longevity is essential — Kerala humidity kills weak scents fast. No alcohol sting on skin.',
-    open:'Not limited to Middle Eastern — open to niche and designer too, going forward.'
-  };
-  await saveProfileData();
 }
 
 let considerations = { entries: [], nextNo: 1 };
@@ -1504,7 +1490,7 @@ document.getElementById('saveConsiderEntry').onclick = async ()=>{
     considerations.entries[idx] = {...considerations.entries[idx], ...data};
     await saveConsiderEntryToStorage(considerations.entries[idx]);
   } else {
-    const newEntry = {id:'c'+Date.now(), no: await nextEntryNo('consider:', considerations.entries), ...data};
+    const newEntry = {id:'c'+Date.now(), no: await nextEntryNo('consider-counter', 'consider:'), ...data};
     considerations.entries.push(newEntry);
     await saveConsiderEntryToStorage(newEntry);
     await saveConsiderMeta();
@@ -1518,23 +1504,6 @@ async function removeConsiderEntry(id){
   considerations.entries = considerations.entries.filter(e=>e.id!==id);
   await deleteConsiderEntryFromStorage(id);
   renderConsiderations();
-}
-
-async function seedConsiderIfEmpty(){
-  const seedList = [
-    {id:'c1',no:1,brand:'Rayhaan',name:'Pacific Aura',tags:['Fresh'],verdict:'Considering',
-      notes:`Fits the fresh / gym / summer slot. Fresh-citrus-mint opening, amber-fig-ambroxan base. Reviews are mixed on longevity (4-5 hrs to all-day depending on skin and batch), and it's widely noted as a dupe of LV Pacific Chill — near-identical to a few other clones. Competent, but not distinctive.`,
-      link1:'',link2:'',link3:''},
-    {id:'c2',no:2,brand:'Armaf',name:'Club de Nuit Intense Man',tags:['Fresh','Other'],verdict:'Considering',
-      notes:`Pineapple, blackcurrant and apple top notes with a smoky-fruity dry-down — genuinely distinctive, not just clean freshness. Known for exceptional longevity and projection at this price point. Caveat: it's an EDT, not EDP/Extrait, and can project stronger than gym-subtle if sprayed heavy.`,
-      link1:'',link2:'',link3:''},
-    {id:'c3',no:3,brand:'Lattafa',name:'Najdia Intense',tags:['Fresh'],verdict:'Considering',
-      notes:`Fresh marine-woody profile with reported genuine longevity. Closer to the subtle-but-intentional gym register than Pacific Aura, without the fruity punch of the Armaf pick.`,
-      link1:'',link2:'',link3:''},
-  ];
-  considerations.nextNo = 4;
-  for(const entry of seedList){ await saveConsiderEntryToStorage(entry); }
-  await saveConsiderMeta();
 }
 
 function switchTab(tab){
@@ -1605,12 +1574,8 @@ function showLoadError(what, reason){
   const considerSortVal = val(considerSortRes);
   if(considerSortVal) document.getElementById('c_sortSel').value = considerSortVal;
 
-  if(!migrated && vault.entries.length === 0){
-    if(entriesFetchFailed){
-      showLoadError('collection', entriesRes.reason);
-    } else {
-      await seedIfEmpty();
-    }
+  if(!migrated && vault.entries.length === 0 && entriesFetchFailed){
+    showLoadError('collection', entriesRes.reason);
   }
 
   fillProfileForm();
@@ -1625,62 +1590,42 @@ function showLoadError(what, reason){
   const considerFetchFailed = considerListRes.status === 'rejected';
   const considerDocs = (considerListRes.status==='fulfilled' && considerListRes.value && considerListRes.value.docs) || [];
   for(const d of considerDocs){ try{ if(d.value) considerations.entries.push(JSON.parse(d.value)); }catch(e){} }
-  if(considerations.entries.length === 0){
-    if(considerFetchFailed){
-      showLoadError('Under Consideration list', considerListRes.reason);
-    } else {
-      await seedConsiderIfEmpty();
-    }
+  if(considerations.entries.length === 0 && considerFetchFailed){
+    showLoadError('Under Consideration list', considerListRes.reason);
   }
   renderConsiderations();
 
   switchTab(val(tabRes) || 'consider');
 
   // TEMPORARY one-time repair tool. Run once from the browser console with:
-  //   await __cleanupAndRenumber()
-  // What it does, in order:
-  //  1) Fetches your entries directly from the database (not from what's currently on
-  //     screen — this matters, since a tab open for a while can have a stale picture).
-  //  2) Finds and removes any leftover demo/placeholder entries from an earlier bug
-  //     (they have fixed, known IDs — s1-s11 for Collection, c1-c3 for Under
-  //     Consideration — that can't collide with any of your real entries, which use a
-  //     timestamp-based ID). It shows you exactly what it's about to delete first.
-  //  3) Renumbers everything that's left, in both tabs, sequentially — closing any
-  //     gaps or duplicates.
-  //  4) Reloads the page so what you see matches what's actually in the database.
-  // Remove this block once you've run it and confirmed the site looks right.
-  window.__cleanupAndRenumber = async function(){
-    const seedCollectionIds = new Set(['s1','s2','s3','s4','s5','s6','s7','s8','s9','s10','s11']);
-    const seedConsiderIds = new Set(['c1','c2','c3']);
-
+  //   await __renumberAndFixCounters()
+  // What it does:
+  //  1) Fetches your entries directly from the database (not what's on screen).
+  //  2) Renumbers everything in both tabs sequentially, in current order, closing any
+  //     gaps or duplicates left over from before this fix existed.
+  //  3) Sets the new atomic counters (entry-counter / consider-counter) to match, so
+  //     the next thing you add continues on cleanly from the right number.
+  //  4) Reloads the page.
+  // Remove this block once you've run it and confirmed the numbering looks right.
+  window.__renumberAndFixCounters = async function(){
     const freshEntriesRes = await FirestoreStore.listWithData('entry:', false);
     const freshConsiderRes = await FirestoreStore.listWithData('consider:', false);
-
     const allEntries = (freshEntriesRes.docs||[]).map(d=>{ try{ return JSON.parse(d.value); }catch(e){ return null; } }).filter(Boolean);
     const allConsider = (freshConsiderRes.docs||[]).map(d=>{ try{ return JSON.parse(d.value); }catch(e){ return null; } }).filter(Boolean);
 
-    const bogusEntries = allEntries.filter(e=>seedCollectionIds.has(e.id));
-    const bogusConsider = allConsider.filter(e=>seedConsiderIds.has(e.id));
-    const summaryLines = [
-      ...bogusEntries.map(e=>`Collection: ${e.brand} — ${e.name}`),
-      ...bogusConsider.map(e=>`Under Consideration: ${e.brand} — ${e.name}`)
-    ];
-    const summary = summaryLines.length ? summaryLines.join('\n') : '(none found)';
+    if(!confirm(`This will renumber all ${allEntries.length} collection entries and all ${allConsider.length} consideration entries sequentially, in their current order, closing any gaps/duplicates, then reload the page. Continue?`)) return;
 
-    if(!confirm(`This checks the database directly and will:\n\n1) Delete these leftover demo entries, if present:\n${summary}\n\n2) Renumber everything remaining in both tabs sequentially, closing any gaps/duplicates.\n\n3) Reload the page.\n\nContinue?`)) return;
-
-    for(const e of bogusEntries){ await deleteEntryFromStorage(e.id); }
-    for(const e of bogusConsider){ await deleteConsiderEntryFromStorage(e.id); }
-
-    const remainingEntries = allEntries.filter(e=>!seedCollectionIds.has(e.id)).sort((a,b)=>(a.no||0)-(b.no||0));
+    const sortedEntries = [...allEntries].sort((a,b)=>(a.no||0)-(b.no||0));
     let n = 1;
-    for(const e of remainingEntries){ e.no = n++; await saveEntryToStorage(e); }
+    for(const e of sortedEntries){ e.no = n++; await saveEntryToStorage(e); }
+    try{ await setDoc(doc(db, KV, 'entry-counter'), {value: JSON.stringify({count: sortedEntries.length})}); }catch(e){}
 
-    const remainingConsider = allConsider.filter(e=>!seedConsiderIds.has(e.id)).sort((a,b)=>(a.no||0)-(b.no||0));
+    const sortedConsider = [...allConsider].sort((a,b)=>(a.no||0)-(b.no||0));
     let cn = 1;
-    for(const e of remainingConsider){ e.no = cn++; await saveConsiderEntryToStorage(e); }
+    for(const e of sortedConsider){ e.no = cn++; await saveConsiderEntryToStorage(e); }
+    try{ await setDoc(doc(db, KV, 'consider-counter'), {value: JSON.stringify({count: sortedConsider.length})}); }catch(e){}
 
-    alert(`Done.\n\nRemoved ${bogusEntries.length} demo collection entr${bogusEntries.length===1?'y':'ies'} and ${bogusConsider.length} demo consideration entr${bogusConsider.length===1?'y':'ies'}.\nRenumbered ${remainingEntries.length} collection entries and ${remainingConsider.length} consideration entries.\n\nReloading now.`);
+    alert(`Done.\n\nRenumbered ${sortedEntries.length} collection entries and ${sortedConsider.length} consideration entries.\n\nReloading now.`);
     location.reload();
   };
 })();
