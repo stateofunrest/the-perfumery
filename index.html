@@ -190,7 +190,11 @@ html[data-theme="light"] select.sort{
   transition:background-position .2s ease;
 }
 
-.tagbar{display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px;margin-bottom:26px;position:relative;max-height:208px;overflow-y:auto;overflow-x:hidden;padding-right:2px;}
+.tagbar{display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px;position:relative;max-height:31px;overflow:hidden;transition:max-height .25s ease;}
+.tagbar.expanded{max-height:600px;}
+.tagbar-wrap{margin-bottom:26px;}
+.tagbar-toggle{display:block;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gold);background:transparent;border:1px solid var(--line);border-radius:20px;padding:5px 12px;cursor:pointer;transition:.15s;}
+.tagbar-toggle:hover{border-color:var(--amber);color:var(--amber);}
 .tagchip{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);color:var(--text-muted);cursor:pointer;background:transparent;transition:.15s;}
 .tagchip.active{color:#17120F;border-color:transparent;background:var(--accent-gradient);}
 .tagchip[data-tag="Oud"].active{background:var(--oud);color:#EFE7DA;}
@@ -402,7 +406,10 @@ html[data-theme="light"] select.sort{
       <span id="compareCount">Select up to 3 to compare</span>
       <button class="btn primary" id="compareGoBtn" disabled><span>Compare</span></button>
     </div>
-    <div class="tagbar" id="tagbar"></div>
+    <div class="tagbar-wrap">
+      <div class="tagbar" id="tagbar"></div>
+      <button type="button" class="tagbar-toggle" id="tagbarToggle">▾ Show all tags</button>
+    </div>
     <div id="loadingMsg" class="loading">Opening the perfumery…</div>
     <div class="grid" id="grid" style="display:none;"></div>
   </div>
@@ -798,6 +805,12 @@ function buildTagbar(){
     };
   });
 }
+document.getElementById('tagbarToggle').onclick = ()=>{
+  const bar = document.getElementById('tagbar');
+  const btn = document.getElementById('tagbarToggle');
+  const isExpanded = bar.classList.toggle('expanded');
+  btn.textContent = isExpanded ? '▴ Show fewer tags' : '▾ Show all tags';
+};
 
 const STAR_PATH = "M12 1.5 15.09 8.26 22.5 9.27 17.25 14.14 18.68 21.75 12 18.02 5.32 21.75 6.75 14.14 1.5 9.27 8.91 8.26 Z";
 function starRow(v){
@@ -1174,16 +1187,27 @@ document.getElementById('saveEntry').onclick = async ()=>{
     movingFromConsiderId = null;
     considerations.entries = considerations.entries.filter(e=>e.id!==removedId);
     await deleteConsiderEntryFromStorage(removedId);
+    await closeNumberGaps(considerations.entries, saveConsiderEntryToStorage, 'consider-counter');
     renderConsiderations();
     switchTab('collection');
   }
   render();
 };
 
+async function closeNumberGaps(entries, saveFn, counterKey){
+  const sorted = [...entries].sort((a,b)=>(a.no||0)-(b.no||0));
+  let n = 1;
+  for(const e of sorted){
+    if(e.no !== n){ e.no = n; await saveFn(e); }
+    n++;
+  }
+  try{ await setDoc(doc(db, KV, counterKey), {value: JSON.stringify({count: sorted.length})}); }catch(err){}
+}
 async function removeEntry(id){
   if(!confirm('Remove this entry?')) return;
   vault.entries = vault.entries.filter(e=>e.id!==id);
   await deleteEntryFromStorage(id);
+  await closeNumberGaps(vault.entries, saveEntryToStorage, 'entry-counter');
   render();
 }
 
@@ -1216,7 +1240,12 @@ function normalizePriceValue(val){
   const m = val.match(/^([^\d]*)([\d,]*)/);
   let prefix = (m && m[1] !== undefined) ? m[1] : '';
   const numPart = (m && m[2]) ? m[2] : '';
-  if(prefix.trim() === '' ) prefix = numPart ? '₹' : '';
+  const trimmedPrefix = prefix.trim();
+  // Treat common ways of writing "rupees" (typed by hand, or scraped off a page that
+  // uses "Rs" instead of the symbol) the same as an empty prefix, so they still get
+  // normalized to ₹ with proper Indian digit grouping — not just a bare ₹ symbol.
+  const isRupeeIndicator = trimmedPrefix === '' || /^(rs\.?|inr|rupees?|₹)$/i.test(trimmedPrefix);
+  if(isRupeeIndicator) prefix = numPart ? '₹' : '';
   const digitsOnly = numPart.replace(/,/g,'');
   const formattedNum = prefix.trim()==='₹' ? formatIndianNumber(digitsOnly) : digitsOnly;
   return prefix + formattedNum;
@@ -1503,6 +1532,7 @@ async function removeConsiderEntry(id){
   if(!confirm('Remove this from Under Consideration?')) return;
   considerations.entries = considerations.entries.filter(e=>e.id!==id);
   await deleteConsiderEntryFromStorage(id);
+  await closeNumberGaps(considerations.entries, saveConsiderEntryToStorage, 'consider-counter');
   renderConsiderations();
 }
 
