@@ -352,7 +352,7 @@ html[data-theme="light"] select.sort{
     <svg class="title-svg" viewBox="0 0 560 84" preserveAspectRatio="xMinYMid meet" role="img" aria-label="The Perfumery">
       <text x="2" y="62" class="title-svg-text" fill="url(#titleGrad)">The Perfumery</text>
     </svg>
-    <p class="subtitle">Everything you own, rated on your terms &mdash; longevity, projection, and how it actually sits on your skin.</p>
+    <p class="subtitle">Everything you own, rated on your terms &mdash; longevity, projection, and how it actually sits on your skin &mdash; plus everything you're eyeing, with your reasoning and the links you found, so you're not re-researching the same bottle twice.</p>
     <div class="goldrule"></div>
   </header>
 
@@ -396,6 +396,7 @@ html[data-theme="light"] select.sort{
         <option value="new">Sort: newest first</option>
         <option value="old">Sort: oldest first</option>
         <option value="az">Sort: A–Z</option>
+        <option value="za">Sort: Z–A</option>
         <option value="price_low">Sort: price (low to high)</option>
         <option value="price_high">Sort: price (high to low)</option>
       </select>
@@ -415,7 +416,6 @@ html[data-theme="light"] select.sort{
   </div>
 
   <div class="tab-panel hidden" id="panel-consider">
-    <p class="subtitle" style="margin-bottom:18px;">Perfumes you're eyeing, with your reasoning and the links you found, so you're not re-researching the same bottle twice.</p>
     <div class="toolbar">
       <div class="search-wrap">
         <input class="search" id="c_search" placeholder="Search by name or brand…">
@@ -425,6 +425,7 @@ html[data-theme="light"] select.sort{
         <option value="new">Sort: newest first</option>
         <option value="old">Sort: oldest first</option>
         <option value="az">Sort: A–Z</option>
+        <option value="za">Sort: Z–A</option>
         <option value="price_low">Sort: price (low to high)</option>
         <option value="price_high">Sort: price (high to low)</option>
       </select>
@@ -434,6 +435,10 @@ html[data-theme="light"] select.sort{
     <div class="compare-bar hidden" id="c_compareBar">
       <span id="c_compareCount">Select up to 3 to compare</span>
       <button class="btn primary" id="c_compareGoBtn" disabled><span>Compare</span></button>
+    </div>
+    <div class="tagbar-wrap">
+      <div class="tagbar" id="c_tagbar"></div>
+      <button type="button" class="tagbar-toggle" id="c_tagbarToggle">▾ Show all tags</button>
     </div>
     <div class="grid" id="considerGrid"></div>
   </div>
@@ -671,6 +676,7 @@ function chipHtml(t){
 let vault = { entries: [], nextNo: 1 };
 let profile = {};
 let activeFilters = new Set();
+let activeFiltersConsider = new Set();
 let editingId = null;
 let pendingPhoto = null;
 let pendingConsiderPhoto = null;
@@ -795,7 +801,7 @@ document.getElementById('saveProfile').onclick = async ()=>{
 
 function buildTagbar(){
   const bar = document.getElementById('tagbar');
-  bar.innerHTML = getAllTags().map(t=>`<button class="tagchip" data-tag="${t}">${t}</button>`).join('');
+  bar.innerHTML = getAllTags().map(t=>`<button class="tagchip ${activeFilters.has(t)?'active':''}" data-tag="${t}">${t}</button>`).join('');
   bar.querySelectorAll('.tagchip').forEach(chip=>{
     chip.onclick = ()=>{
       const t = chip.dataset.tag;
@@ -808,6 +814,24 @@ function buildTagbar(){
 document.getElementById('tagbarToggle').onclick = ()=>{
   const bar = document.getElementById('tagbar');
   const btn = document.getElementById('tagbarToggle');
+  const isExpanded = bar.classList.toggle('expanded');
+  btn.textContent = isExpanded ? '▴ Show fewer tags' : '▾ Show all tags';
+};
+function buildTagbarConsider(){
+  const bar = document.getElementById('c_tagbar');
+  bar.innerHTML = getAllTags().map(t=>`<button class="tagchip ${activeFiltersConsider.has(t)?'active':''}" data-tag="${t}">${t}</button>`).join('');
+  bar.querySelectorAll('.tagchip').forEach(chip=>{
+    chip.onclick = ()=>{
+      const t = chip.dataset.tag;
+      if(activeFiltersConsider.has(t)) activeFiltersConsider.delete(t); else activeFiltersConsider.add(t);
+      chip.classList.toggle('active');
+      renderConsiderations();
+    };
+  });
+}
+document.getElementById('c_tagbarToggle').onclick = ()=>{
+  const bar = document.getElementById('c_tagbar');
+  const btn = document.getElementById('c_tagbarToggle');
   const isExpanded = bar.classList.toggle('expanded');
   btn.textContent = isExpanded ? '▴ Show fewer tags' : '▾ Show all tags';
 };
@@ -849,6 +873,7 @@ function render(){
   else if(sort==='new') list.sort((a,b)=>b.no-a.no);
   else if(sort==='old') list.sort((a,b)=>a.no-b.no);
   else if(sort==='az') list.sort((a,b)=>(a.brand+a.name).localeCompare(b.brand+b.name));
+  else if(sort==='za') list.sort((a,b)=>(b.brand+b.name).localeCompare(a.brand+a.name));
   else if(sort==='price_low') list.sort((a,b)=>(parseFloat((a.price||'0').replace(/[^0-9.]/g,''))||0)-(parseFloat((b.price||'0').replace(/[^0-9.]/g,''))||0));
   else if(sort==='price_high') list.sort((a,b)=>(parseFloat((b.price||'0').replace(/[^0-9.]/g,''))||0)-(parseFloat((a.price||'0').replace(/[^0-9.]/g,''))||0));
 
@@ -1041,6 +1066,7 @@ async function handleNewTagAdd(containerId){
   await addCustomTag(name);
   buildTagpick([...currentlySelected, name], containerId);
   buildTagbar();
+  buildTagbarConsider();
 }
 document.getElementById('newtag_add').onclick = ()=>handleNewTagAdd('tagpick');
 document.getElementById('newtag_input').onkeydown = (e)=>{ if(e.key==='Enter'){ e.preventDefault(); handleNewTagAdd('tagpick'); } };
@@ -1379,8 +1405,10 @@ function renderConsiderations(){
     return;
   }
   let list = [...considerations.entries];
+  list = list.filter(e=>activeFiltersConsider.size===0 || (e.tags||[]).some(t=>activeFiltersConsider.has(t)));
   if(sort==='old') list.sort((a,b)=>a.no-b.no);
   else if(sort==='az') list.sort((a,b)=>(a.brand+a.name).localeCompare(b.brand+b.name));
+  else if(sort==='za') list.sort((a,b)=>(b.brand+b.name).localeCompare(a.brand+a.name));
   else if(sort==='price_low') list.sort((a,b)=>(parseFloat((a.lowestPrice||'0').replace(/[^0-9.]/g,''))||0)-(parseFloat((b.lowestPrice||'0').replace(/[^0-9.]/g,''))||0));
   else if(sort==='price_high') list.sort((a,b)=>(parseFloat((b.lowestPrice||'0').replace(/[^0-9.]/g,''))||0)-(parseFloat((a.lowestPrice||'0').replace(/[^0-9.]/g,''))||0));
   else list.sort((a,b)=>b.no-a.no); // 'new' (default)
@@ -1623,6 +1651,7 @@ function showLoadError(what, reason){
   if(considerations.entries.length === 0 && considerFetchFailed){
     showLoadError('Under Consideration list', considerListRes.reason);
   }
+  buildTagbarConsider();
   renderConsiderations();
 
   switchTab(val(tabRes) || 'consider');
