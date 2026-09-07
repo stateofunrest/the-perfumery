@@ -548,6 +548,7 @@ html[data-theme="light"] select.sort{
         </select>
       </div>
     </div>
+    <div class="field"><label>Purchased from</label><input id="f_purchasedFrom" placeholder="e.g. Amazon, local souk, brand website"></div>
     <div class="row3">
       <div class="field"><label>Longevity <span id="lv_val">1</span>/5</label>
         <div class="slider-row"><input type="range" min="1" max="5" value="1" id="f_longevity"></div>
@@ -901,6 +902,7 @@ function render(){
           <div class="stat"><span class="lbl">Quality</span><div class="dots">${dots(e.quality)}</div></div>
         </div>
         <div class="meta-row"><span>${e.format||''}</span><span>${e.price||''}</span></div>
+        ${e.purchasedFrom?`<div class="meta-row"><span>Purchased from</span><span>${e.purchasedFrom}</span></div>`:''}
         <div class="sting ${e.sting?'on':''}">${e.sting?'⚠ alcohol sting':'✓ sits clean on skin'}</div>
         ${e.notes?`<div class="notes">${e.notes}</div>`:''}
       </div>
@@ -960,6 +962,7 @@ function openCompareModal(){
     {label:'Quality', render:e=>`<div class="dots">${dots(e.quality)}</div>`},
     {label:'Format', render:e=>e.format||'—'},
     {label:'Price', render:e=>e.price||'—'},
+    {label:'Purchased from', render:e=>e.purchasedFrom||'—'},
     {label:'Skin feel', render:e=>e.sting?'⚠ stings':'✓ sits clean'},
     {label:'Tags', render:e=>`<div class="chips">${(e.tags||[]).map(t=>chipHtml(t)).join('')}</div>`},
     {label:'Notes', render:e=>e.notes||'—'},
@@ -1130,6 +1133,7 @@ function openModal(id){
   document.getElementById('f_name').value = e?.name || '';
   document.getElementById('f_format').value = e?.format || 'EDP';
   document.getElementById('f_price').value = e ? normalizePriceValue(e.price || '') : '₹';
+  document.getElementById('f_purchasedFrom').value = e?.purchasedFrom || '';
   document.getElementById('f_overall').value = e?.overall || 1;
   document.getElementById('f_longevity').value = e?.longevity || 1;
   document.getElementById('lv_val').textContent = e?.longevity || 1;
@@ -1163,6 +1167,7 @@ function openMoveToCollectionModal(considerId){
   document.getElementById('f_name').value = c.name || '';
   document.getElementById('f_format').value = 'EDP';
   document.getElementById('f_price').value = normalizePriceValue(c.lowestPrice || '₹');
+  document.getElementById('f_purchasedFrom').value = '';
   document.getElementById('f_overall').value = 1;
   document.getElementById('f_longevity').value = 1;
   document.getElementById('lv_val').textContent = 1;
@@ -1190,6 +1195,7 @@ document.getElementById('saveEntry').onclick = async ()=>{
     tags: getPickedTags(),
     format: document.getElementById('f_format').value,
     price: cleanEmptyPrice(document.getElementById('f_price').value),
+    purchasedFrom: document.getElementById('f_purchasedFrom').value.trim(),
     overall: parseFloat(document.getElementById('f_overall').value),
     longevity: parseInt(document.getElementById('f_longevity').value),
     projection: parseInt(document.getElementById('f_projection').value),
