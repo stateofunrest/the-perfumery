@@ -191,6 +191,8 @@ html[data-theme="light"] select.sort{
 }
 
 .tagbar-wrap{margin-bottom:26px;display:flex;align-items:flex-start;gap:8px;}
+.tagbar-wrap.expanded{flex-direction:column;align-items:stretch;gap:10px;}
+.tagbar-wrap.expanded .tagbar-toggle{order:-1;align-self:flex-end;}
 .tagbar{display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px;position:relative;max-height:31px;overflow:hidden;transition:max-height .25s ease;flex:1;min-width:0;}
 .tagbar.expanded{max-height:70vh;overflow-y:auto;}
 .tagbar-toggle{flex-shrink:0;white-space:nowrap;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gold);background:transparent;border:1px solid var(--line);border-radius:20px;padding:5px 12px;cursor:pointer;transition:.15s;}
@@ -816,6 +818,7 @@ document.getElementById('tagbarToggle').onclick = ()=>{
   const bar = document.getElementById('tagbar');
   const btn = document.getElementById('tagbarToggle');
   const isExpanded = bar.classList.toggle('expanded');
+  bar.closest('.tagbar-wrap').classList.toggle('expanded', isExpanded);
   btn.textContent = isExpanded ? '▴ Show fewer tags' : '▾ Show all tags';
 };
 function buildTagbarConsider(){
@@ -834,6 +837,7 @@ document.getElementById('c_tagbarToggle').onclick = ()=>{
   const bar = document.getElementById('c_tagbar');
   const btn = document.getElementById('c_tagbarToggle');
   const isExpanded = bar.classList.toggle('expanded');
+  bar.closest('.tagbar-wrap').classList.toggle('expanded', isExpanded);
   btn.textContent = isExpanded ? '▴ Show fewer tags' : '▾ Show all tags';
 };
 
