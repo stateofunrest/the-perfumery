@@ -192,7 +192,22 @@ html[data-theme="light"] select.sort{
 
 .tagbar-wrap{margin-bottom:26px;display:flex;align-items:flex-start;gap:8px;}
 .tagbar-wrap.expanded{flex-direction:column;align-items:stretch;gap:10px;}
-.tagbar-wrap.expanded .tagbar-toggle{order:-1;align-self:flex-end;}
+.tagbar-wrap.expanded .tagbar-controls{order:-1;align-self:flex-end;}
+.tagbar-controls{display:flex;gap:8px;flex-shrink:0;}
+.tagbar-wrap:not(.expanded) .tagbar-manage{display:none;}
+.tagbar-manage{white-space:nowrap;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-muted);background:transparent;border:1px solid var(--line);border-radius:20px;padding:5px 12px;cursor:pointer;transition:.15s;}
+.tagbar-manage:hover{border-color:var(--danger);color:var(--danger);}
+.manage-tags-note{font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.5;}
+.manage-tags-error{background:rgba(168,92,74,.15);border:1px solid var(--danger);color:var(--danger);padding:10px 12px;border-radius:2px;font-size:12.5px;margin-bottom:14px;}
+.manage-tags-error.hidden{display:none;}
+.manage-tags-empty{color:var(--text-muted);font-size:13px;padding:20px 0;text-align:center;}
+.tag-manage-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);}
+.tag-manage-row:last-child{border-bottom:none;}
+.tag-manage-input{flex:1 1 120px;min-width:100px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:2px;font-size:13px;font-family:'Work Sans';}
+.tag-manage-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-muted);white-space:nowrap;}
+.tag-manage-save,.tag-manage-del{font-family:'IBM Plex Mono',monospace;font-size:11px;background:transparent;border:1px solid var(--line);color:var(--text-muted);padding:6px 10px;border-radius:2px;cursor:pointer;white-space:nowrap;}
+.tag-manage-save:hover{border-color:var(--amber);color:var(--amber);}
+.tag-manage-del:hover{border-color:var(--danger);color:var(--danger);}
 .tagbar{display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px;position:relative;max-height:31px;overflow:hidden;transition:max-height .25s ease;flex:1;min-width:0;}
 .tagbar.expanded{max-height:70vh;overflow-y:auto;}
 .tagbar-toggle{flex-shrink:0;white-space:nowrap;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gold);background:transparent;border:1px solid var(--line);border-radius:20px;padding:5px 12px;cursor:pointer;transition:.15s;}
@@ -411,7 +426,10 @@ html[data-theme="light"] select.sort{
     </div>
     <div class="tagbar-wrap">
       <div class="tagbar" id="tagbar"></div>
-      <button type="button" class="tagbar-toggle" id="tagbarToggle">▾ Show all tags</button>
+      <div class="tagbar-controls">
+        <button type="button" class="tagbar-manage" id="manageTagsBtn">Manage tags</button>
+        <button type="button" class="tagbar-toggle" id="tagbarToggle">▾ Show all tags</button>
+      </div>
     </div>
     <div id="loadingMsg" class="loading">Opening the perfumery…</div>
     <div class="grid" id="grid" style="display:none;"></div>
@@ -440,7 +458,10 @@ html[data-theme="light"] select.sort{
     </div>
     <div class="tagbar-wrap">
       <div class="tagbar" id="c_tagbar"></div>
-      <button type="button" class="tagbar-toggle" id="c_tagbarToggle">▾ Show all tags</button>
+      <div class="tagbar-controls">
+        <button type="button" class="tagbar-manage" id="c_manageTagsBtn">Manage tags</button>
+        <button type="button" class="tagbar-toggle" id="c_tagbarToggle">▾ Show all tags</button>
+      </div>
     </div>
     <div class="grid" id="considerGrid"></div>
   </div>
@@ -456,6 +477,18 @@ html[data-theme="light"] select.sort{
       <button type="button" class="search-clear hidden" id="glossarySearchClear" aria-label="Clear search">&times;</button>
     </div>
     <div id="glossaryList" class="glossary-list"></div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="manageTagsOverlay">
+  <div class="modal">
+    <div class="modal-actions" style="justify-content:space-between;margin-top:0;margin-bottom:16px;">
+      <h2 style="margin:0;">Manage scent tags</h2>
+      <button class="btn ghost" id="closeManageTags">Close</button>
+    </div>
+    <div class="manage-tags-note">Only tags you've added yourself (via "Other" in the tag picker) can be renamed or deleted here. Built-in tags — Oud, Gourmand, Amber, Rose, Fresh, Sandalwood, Vetiver, Other — aren't editable.</div>
+    <div id="manageTagsError" class="manage-tags-error hidden"></div>
+    <div id="manageTagsList"></div>
   </div>
 </div>
 
@@ -646,6 +679,81 @@ async function addCustomTag(name){
   customTags.push(name);
   try{ await FirestoreStore.set('custom-tags', JSON.stringify(customTags), false); }catch(e){ console.error('could not save new tag', e); }
   return name;
+}
+
+function escAttr(s){ return String(s).replace(/"/g,'&quot;'); }
+
+function countTagUsage(tag){
+  return vault.entries.filter(e=>(e.tags||[]).includes(tag)).length
+       + considerations.entries.filter(e=>(e.tags||[]).includes(tag)).length;
+}
+
+// Shared cascade helper for rename/delete: walks a list of entries, rewrites
+// each one's tags array with `transform`, and persists only the ones that
+// actually contained the tag. Returns which entries (if any) failed to save,
+// so the caller can decide whether it's safe to touch the master tag list.
+async function cascadeTagChange(tag, transform, entries, saveFn){
+  const failures = [];
+  for(const e of entries){
+    if(!(e.tags||[]).includes(tag)) continue;
+    const newTags = transform(e.tags);
+    const updated = {...e, tags:newTags};
+    try{
+      await saveFn(updated);
+      Object.assign(e, updated);
+    }catch(err){
+      console.error('failed to update tags on entry', e.id, err);
+      failures.push(e.brand && e.name ? `${e.brand} ${e.name}` : (e.id||'unknown entry'));
+    }
+  }
+  return failures;
+}
+
+async function renameCustomTag(oldName, newNameRaw){
+  let newName = (newNameRaw||'').trim();
+  if(!newName) return {ok:false, error:'Name cannot be empty.'};
+  newName = newName.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  if(newName === oldName) return {ok:true, unchanged:true};
+  if(newName.toLowerCase() === OTHER_TAG.toLowerCase() || BASE_TAGS.some(b=>b.toLowerCase()===newName.toLowerCase())){
+    return {ok:false, error:`"${newName}" is a built-in tag name and can't be reused.`};
+  }
+  // Renaming to an existing custom tag's name is treated as a merge, not a collision.
+  const mergingInto = customTags.find(t=>t.toLowerCase()===newName.toLowerCase() && t!==oldName);
+  const finalName = mergingInto || newName;
+  const rewrite = tags => [...new Set(tags.map(t=>t===oldName?finalName:t))];
+
+  const failuresColl = await cascadeTagChange(oldName, rewrite, vault.entries, saveEntryToStorage);
+  const failuresCons = await cascadeTagChange(oldName, rewrite, considerations.entries, saveConsiderEntryToStorage);
+  const failures = [...failuresColl, ...failuresCons];
+  if(failures.length){
+    return {ok:false, error:`Renamed on most entries, but failed to save: ${failures.join(', ')}. The tag list is left unchanged until this is retried, so nothing is inconsistent.`};
+  }
+  // Only touch the master tag list once every affected entry has actually saved.
+  customTags = customTags.filter(t=>t!==oldName);
+  if(!mergingInto) customTags.push(finalName);
+  try{ await FirestoreStore.set('custom-tags', JSON.stringify(customTags), false); }
+  catch(e){ return {ok:false, error:'Entries were updated, but saving the tag list itself failed — please retry so the tag picker stays in sync.'}; }
+
+  if(activeFilters.has(oldName)){ activeFilters.delete(oldName); activeFilters.add(finalName); }
+  if(activeFiltersConsider.has(oldName)){ activeFiltersConsider.delete(oldName); activeFiltersConsider.add(finalName); }
+  return {ok:true, merged: !!mergingInto, finalName};
+}
+
+async function deleteCustomTag(name){
+  const strip = tags => tags.filter(t=>t!==name);
+  const failuresColl = await cascadeTagChange(name, strip, vault.entries, saveEntryToStorage);
+  const failuresCons = await cascadeTagChange(name, strip, considerations.entries, saveConsiderEntryToStorage);
+  const failures = [...failuresColl, ...failuresCons];
+  if(failures.length){
+    return {ok:false, error:`Removed from most entries, but failed to save: ${failures.join(', ')}. The tag is left in the list until this is retried.`};
+  }
+  customTags = customTags.filter(t=>t!==name);
+  try{ await FirestoreStore.set('custom-tags', JSON.stringify(customTags), false); }
+  catch(e){ return {ok:false, error:'Entries were updated, but saving the tag list itself failed — please retry so the tag picker stays in sync.'}; }
+
+  activeFilters.delete(name);
+  activeFiltersConsider.delete(name);
+  return {ok:true};
 }
 
 // Maps common fragrance-note words to the hue of the real ingredient (lemon->yellow, vanilla->brown, etc.)
@@ -840,6 +948,62 @@ document.getElementById('c_tagbarToggle').onclick = ()=>{
   bar.closest('.tagbar-wrap').classList.toggle('expanded', isExpanded);
   btn.textContent = isExpanded ? '▴ Show fewer tags' : '▾ Show all tags';
 };
+
+function showManageTagsError(msg){
+  const box = document.getElementById('manageTagsError');
+  box.textContent = msg;
+  box.classList.remove('hidden');
+}
+function renderManageTagsList(){
+  const el = document.getElementById('manageTagsList');
+  document.getElementById('manageTagsError').classList.add('hidden');
+  if(customTags.length === 0){
+    el.innerHTML = '<div class="manage-tags-empty">No custom tags yet — tags you add via "Other" in the tag picker will show up here.</div>';
+    return;
+  }
+  const sorted = [...customTags].sort((a,b)=>a.localeCompare(b));
+  el.innerHTML = sorted.map(t=>{
+    const count = countTagUsage(t);
+    return `
+    <div class="tag-manage-row" data-tag="${escAttr(t)}">
+      <span class="chip" style="background:${colorForTag(t)}">${t}</span>
+      <input type="text" class="tag-manage-input" value="${escAttr(t)}">
+      <span class="tag-manage-count">${count} ${count===1?'entry':'entries'}</span>
+      <button type="button" class="tag-manage-save">Save</button>
+      <button type="button" class="tag-manage-del">Delete</button>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.tag-manage-row').forEach(row=>{
+    const oldName = row.dataset.tag;
+    const input = row.querySelector('.tag-manage-input');
+    row.querySelector('.tag-manage-save').onclick = async ()=>{
+      const newVal = input.value.trim();
+      if(!newVal || newVal === oldName) return;
+      const res = await renameCustomTag(oldName, newVal);
+      if(!res.ok){ showManageTagsError(res.error); return; }
+      buildTagbar(); buildTagbarConsider(); render(); renderConsiderations();
+      renderManageTagsList();
+    };
+    row.querySelector('.tag-manage-del').onclick = async ()=>{
+      const count = countTagUsage(oldName);
+      const msg = count>0
+        ? `Delete "${oldName}"? It will be removed from ${count} ${count===1?'entry':'entries'} across your Collection and Under Consideration. This can't be undone.`
+        : `Delete "${oldName}"? This can't be undone.`;
+      if(!confirm(msg)) return;
+      const res = await deleteCustomTag(oldName);
+      if(!res.ok){ showManageTagsError(res.error); return; }
+      buildTagbar(); buildTagbarConsider(); render(); renderConsiderations();
+      renderManageTagsList();
+    };
+  });
+}
+function openManageTagsModal(){
+  renderManageTagsList();
+  document.getElementById('manageTagsOverlay').classList.remove('hidden');
+}
+document.getElementById('manageTagsBtn').onclick = openManageTagsModal;
+document.getElementById('c_manageTagsBtn').onclick = openManageTagsModal;
+document.getElementById('closeManageTags').onclick = ()=>document.getElementById('manageTagsOverlay').classList.add('hidden');
 
 const STAR_PATH = "M12 1.5 15.09 8.26 22.5 9.27 17.25 14.14 18.68 21.75 12 18.02 5.32 21.75 6.75 14.14 1.5 9.27 8.91 8.26 Z";
 function starRow(v){
